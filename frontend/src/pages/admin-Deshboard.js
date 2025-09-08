@@ -32,7 +32,8 @@ import {
   Tab,
   Tabs,
   CircularProgress,
-  Alert
+  Alert,
+  InputAdornment
 } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
 import DashboardIcon from '@mui/icons-material/Dashboard';
@@ -42,7 +43,37 @@ import LogoutIcon from '@mui/icons-material/Logout';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import DownloadIcon from '@mui/icons-material/Download';
+import SearchIcon from '@mui/icons-material/Search';
+import BarChartIcon from '@mui/icons-material/BarChart';
+// Import Chart.js components
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend,
+  ArcElement,
+  PointElement,
+  LineElement
+} from 'chart.js';
+import { Bar, Pie, Line } from 'react-chartjs-2';
 
+// Register Chart.js components
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend,
+  ArcElement,
+  PointElement,
+  LineElement
+);
+
+// Define API_URL constant - this was missing and causing the errors
 const API_URL = 'http://localhost:5001/api';
 
 // Custom TabPanel component
@@ -79,6 +110,11 @@ const AdminDashboard = () => {
   const [salarySlips, setSalarySlips] = useState([]);
   const [expenses, setExpenses] = useState([]);
   
+  // Add search state variables
+  const [employeeSearch, setEmployeeSearch] = useState('');
+  const [salarySlipSearch, setSalarySlipSearch] = useState('');
+  const [expenseSearch, setExpenseSearch] = useState('');
+  
   const [salarySlipForm, setSalarySlipForm] = useState({
     employeeId: '',
     month: '',
@@ -108,6 +144,10 @@ const AdminDashboard = () => {
     deductions: '',
     netSalary: ''
   });
+
+  // Add filter state variables
+  const [salarySlipMonthFilter, setSalarySlipMonthFilter] = useState('');
+  const [salarySlipYearFilter, setSalarySlipYearFilter] = useState('');
 
   useEffect(() => {
     // Fetch data
@@ -522,6 +562,265 @@ const AdminDashboard = () => {
     }
   };
 
+  // Chart data processing functions
+  const getDepartmentSalaries = () => {
+    if (!employees || employees.length === 0) return { labels: [], datasets: [] };
+    
+    // Group employees by department
+    const departments = {};
+    employees.forEach(emp => {
+      const dept = emp.department || 'Unassigned';
+      if (!departments[dept]) {
+        departments[dept] = {
+          count: 0,
+          totalSalary: 0
+        };
+      }
+      departments[dept].count += 1;
+      departments[dept].totalSalary += parseFloat(emp.salary) || 0;
+    });
+    
+    // Calculate average salary by department
+    const deptNames = Object.keys(departments);
+    const avgSalaries = deptNames.map(dept => 
+      departments[dept].totalSalary / departments[dept].count
+    );
+    
+    return {
+      labels: deptNames,
+      datasets: [
+        {
+          label: 'Average Salary by Department',
+          data: avgSalaries,
+          backgroundColor: [
+            'rgba(255, 99, 132, 0.6)',
+            'rgba(54, 162, 235, 0.6)',
+            'rgba(255, 206, 86, 0.6)',
+            'rgba(75, 192, 192, 0.6)',
+            'rgba(153, 102, 255, 0.6)',
+          ],
+          borderColor: [
+            'rgba(255, 99, 132, 1)',
+            'rgba(54, 162, 235, 1)',
+            'rgba(255, 206, 86, 1)',
+            'rgba(75, 192, 192, 1)',
+            'rgba(153, 102, 255, 1)',
+          ],
+          borderWidth: 1,
+        },
+      ],
+    };
+  };
+  
+  const getSalaryDistribution = () => {
+    if (!employees || employees.length === 0) return { labels: [], datasets: [] };
+    
+    // Define salary ranges
+    const ranges = [
+      { label: '$0-1000', min: 0, max: 1000 },
+      { label: '$1001-2000', min: 1001, max: 2000 },
+      { label: '$2001-3000', min: 2001, max: 3000 },
+      { label: '$3001-4000', min: 3001, max: 4000 },
+      { label: '$4001+', min: 4001, max: Infinity }
+    ];
+    
+    // Count employees in each salary range
+    const distribution = ranges.map(range => {
+      return employees.filter(emp => {
+        const salary = parseFloat(emp.salary) || 0;
+        return salary >= range.min && salary <= range.max;
+      }).length;
+    });
+    
+    return {
+      labels: ranges.map(r => r.label),
+      datasets: [
+        {
+          label: 'Employees',
+          data: distribution,
+          backgroundColor: 'rgba(54, 162, 235, 0.6)',
+          borderColor: 'rgba(54, 162, 235, 1)',
+          borderWidth: 1,
+        },
+      ],
+    };
+  };
+  
+  const getMonthlySalaryTotals = () => {
+    if (!salarySlips || salarySlips.length === 0) return { labels: [], datasets: [] };
+    
+    const currentYear = new Date().getFullYear().toString();
+    
+    // Filter salary slips for current year
+    const thisYearSlips = salarySlips.filter(slip => slip.year.toString() === currentYear);
+    
+    // Define all months
+    const months = [
+      'January', 'February', 'March', 'April', 'May', 'June', 
+      'July', 'August', 'September', 'October', 'November', 'December'
+    ];
+    
+    // Calculate total salary paid for each month
+    const monthlySalaries = months.map(month => {
+      const monthSlips = thisYearSlips.filter(slip => slip.month === month);
+      return monthSlips.reduce((sum, slip) => sum + parseFloat(slip.netSalary || 0), 0);
+    });
+    
+    return {
+      labels: months,
+      datasets: [
+        {
+          label: `Salary Expenditure (${currentYear})`,
+          data: monthlySalaries,
+          fill: false,
+          borderColor: 'rgb(75, 192, 192)',
+          tension: 0.1,
+          backgroundColor: 'rgba(75, 192, 192, 0.2)',
+        },
+      ],
+    };
+  };
+  
+  // Add expense chart data processing functions
+  const getExpenseStatusDistribution = () => {
+    if (!expenses || expenses.length === 0) return { labels: [], datasets: [] };
+    
+    // Count expenses by status
+    const statusCounts = {
+      pending: 0,
+      approved: 0,
+      rejected: 0
+    };
+    
+    expenses.forEach(expense => {
+      const status = expense.status?.toLowerCase() || 'pending';
+      if (statusCounts.hasOwnProperty(status)) {
+        statusCounts[status]++;
+      }
+    });
+    
+    return {
+      labels: Object.keys(statusCounts).map(s => s.charAt(0).toUpperCase() + s.slice(1)),
+      datasets: [
+        {
+          label: 'Expenses by Status',
+          data: Object.values(statusCounts),
+          backgroundColor: [
+            'rgba(255, 206, 86, 0.6)', // pending - yellow
+            'rgba(75, 192, 192, 0.6)', // approved - green
+            'rgba(255, 99, 132, 0.6)'  // rejected - red
+          ],
+          borderColor: [
+            'rgba(255, 206, 86, 1)',
+            'rgba(75, 192, 192, 1)',
+            'rgba(255, 99, 132, 1)'
+          ],
+          borderWidth: 1,
+        },
+      ],
+    };
+  };
+
+  const getExpensesByCategory = () => {
+    if (!expenses || expenses.length === 0) return { labels: [], datasets: [] };
+    
+    // Group expenses by category
+    const categories = {};
+    expenses.forEach(expense => {
+      const category = expense.category || 'Other';
+      if (!categories[category]) {
+        categories[category] = 0;
+      }
+      categories[category] += parseFloat(expense.amount) || 0;
+    });
+    
+    return {
+      labels: Object.keys(categories),
+      datasets: [
+        {
+          label: 'Expense Amount by Category',
+          data: Object.values(categories),
+          backgroundColor: [
+            'rgba(54, 162, 235, 0.6)',
+            'rgba(255, 99, 132, 0.6)',
+            'rgba(255, 206, 86, 0.6)',
+            'rgba(75, 192, 192, 0.6)',
+            'rgba(153, 102, 255, 0.6)',
+            'rgba(255, 159, 64, 0.6)'
+          ],
+          borderWidth: 1,
+        },
+      ],
+    };
+  };
+
+  const getMonthlyExpenseTrends = () => {
+    if (!expenses || expenses.length === 0) return { labels: [], datasets: [] };
+    
+    const currentYear = new Date().getFullYear().toString();
+    
+    // Define all months
+    const months = [
+      'January', 'February', 'March', 'April', 'May', 'June', 
+      'July', 'August', 'September', 'October', 'November', 'December'
+    ];
+    
+    // Initialize monthly totals
+    const monthlyTotals = Array(12).fill(0);
+    const approvedTotals = Array(12).fill(0);
+    
+    // Calculate expenses for each month
+    expenses.forEach(expense => {
+      try {
+        const expenseDate = new Date(expense.date);
+        if (!isNaN(expenseDate.getTime()) && expenseDate.getFullYear().toString() === currentYear) {
+          const month = expenseDate.getMonth();
+          const amount = parseFloat(expense.amount) || 0;
+          
+          monthlyTotals[month] += amount;
+          
+          if (expense.status === 'approved') {
+            approvedTotals[month] += amount;
+          }
+        }
+      } catch (e) {
+        console.error('Error parsing expense date:', e);
+      }
+    });
+    
+    return {
+      labels: months,
+      datasets: [
+        {
+          label: 'Total Expenses',
+          data: monthlyTotals,
+          borderColor: 'rgb(255, 99, 132)',
+          backgroundColor: 'rgba(255, 99, 132, 0.2)',
+          fill: false,
+          tension: 0.1
+        },
+        {
+          label: 'Approved Expenses',
+          data: approvedTotals,
+          borderColor: 'rgb(75, 192, 192)',
+          backgroundColor: 'rgba(75, 192, 192, 0.2)',
+          fill: false,
+          tension: 0.1
+        }
+      ],
+    };
+  };
+
+  // Helper to calculate total expenses
+  const calculateTotalExpenses = (status = null) => {
+    return expenses.reduce((total, expense) => {
+      if (status === null || expense.status === status) {
+        return total + (parseFloat(expense.amount) || 0);
+      }
+      return total;
+    }, 0).toFixed(2);
+  };
+
   // Drawer content
   const drawerContent = (
     <Box sx={{ width: 250 }} role="presentation">
@@ -559,6 +858,12 @@ const AdminDashboard = () => {
           </ListItemIcon>
           <ListItemText primary="Expenses" />
         </ListItem>
+        <ListItem button onClick={() => setTabValue(4)}>
+          <ListItemIcon>
+            <BarChartIcon />
+          </ListItemIcon>
+          <ListItemText primary="Charts" />
+        </ListItem>
       </List>
       <Divider />
       <List>
@@ -572,6 +877,75 @@ const AdminDashboard = () => {
     </Box>
   );
 
+  // Get unique years from salary slips for the filter dropdown
+  const getUniqueYears = () => {
+    if (!Array.isArray(salarySlips)) return [];
+    
+    const years = salarySlips.map(slip => slip.year).filter(Boolean);
+    return [...new Set(years)].sort((a, b) => b - a); // Sort in descending order
+  };
+  
+  // Reset salary slip filters
+  const resetSalarySlipFilters = () => {
+    setSalarySlipSearch('');
+    setSalarySlipMonthFilter('');
+    setSalarySlipYearFilter('');
+  };
+
+  // Filtered data functions
+  const filteredEmployees = employees.filter(employee => 
+    employee.name.toLowerCase().includes(employeeSearch.toLowerCase()) ||
+    employee.email.toLowerCase().includes(employeeSearch.toLowerCase()) ||
+    (employee.department && employee.department.toLowerCase().includes(employeeSearch.toLowerCase()))
+  );
+
+  // Update the filtered salary slips to include month and year filters
+  const filteredSalarySlips = Array.isArray(salarySlips) ? salarySlips.filter(slip => {
+    // First apply search filter
+    const matchesSearch = 
+      !salarySlipSearch || 
+      (slip.employeeName && slip.employeeName.toLowerCase().includes(salarySlipSearch.toLowerCase())) ||
+      (slip.month && slip.month.toLowerCase().includes(salarySlipSearch.toLowerCase())) ||
+      (slip.year && slip.year.toString().includes(salarySlipSearch));
+    
+    // Then apply month filter if set
+    const matchesMonth = 
+      !salarySlipMonthFilter || 
+      (slip.month === salarySlipMonthFilter);
+    
+    // Then apply year filter if set
+    const matchesYear = 
+      !salarySlipYearFilter || 
+      (slip.year && slip.year.toString() === salarySlipYearFilter);
+    
+    // Return true only if all conditions are met
+    return matchesSearch && matchesMonth && matchesYear;
+  }) : [];
+
+  const filteredExpenses = Array.isArray(expenses) ? expenses.filter(expense => 
+    (expense.employeeName && expense.employeeName.toLowerCase().includes(expenseSearch.toLowerCase())) ||
+    (expense.title && expense.title.toLowerCase().includes(expenseSearch.toLowerCase())) ||
+    (expense.category && expense.category.toLowerCase().includes(expenseSearch.toLowerCase())) ||
+    (expense.status && expense.status.toLowerCase().includes(expenseSearch.toLowerCase())) ||
+    (expense.date && expense.date.includes(expenseSearch))
+  ) : [];
+
+  // Add a helper function to format dates
+  const formatDate = (dateString) => {
+    if (!dateString) return '';
+    
+    // Try parsing the date string to ensure it's valid
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return dateString; // Return original if invalid
+    
+    // Format as DD/MM/YYYY
+    const day = date.getDate().toString().padStart(2, '0');
+    const month = (date.getMonth() + 1).toString().padStart(2, '0'); // Months are 0-indexed
+    const year = date.getFullYear();
+    
+    return `${day}/${month}/${year}`;
+  };
+  
   return (
     <Box sx={{ display: 'flex' }}>
       <AppBar position="fixed">
@@ -623,6 +997,7 @@ const AdminDashboard = () => {
           <Tab label="Employees" />
           <Tab label="Salary Slips" />
           <Tab label="Expenses" />
+          <Tab label="Charts" />
         </Tabs>
         
         {error && (
@@ -679,6 +1054,23 @@ const AdminDashboard = () => {
             <Typography variant="h5">Employee List</Typography>
           </Box>
           
+          {/* Add search field */}
+          <TextField
+            fullWidth
+            variant="outlined"
+            placeholder="Search employees..."
+            value={employeeSearch}
+            onChange={(e) => setEmployeeSearch(e.target.value)}
+            sx={{ mb: 2 }}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon />
+                </InputAdornment>
+              ),
+            }}
+          />
+          
           <TableContainer component={Paper}>
             <Table>
               <TableHead>
@@ -691,7 +1083,7 @@ const AdminDashboard = () => {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {employees.map(employee => (
+                {filteredEmployees.map(employee => (
                   <TableRow key={employee.id}>
                     <TableCell>{employee.name}</TableCell>
                     <TableCell>{employee.email}</TableCell>
@@ -704,6 +1096,13 @@ const AdminDashboard = () => {
                     </TableCell>
                   </TableRow>
                 ))}
+                {filteredEmployees.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={5} align="center">
+                      No employees found matching your search
+                    </TableCell>
+                  </TableRow>
+                )}
               </TableBody>
             </Table>
           </TableContainer>
@@ -721,6 +1120,71 @@ const AdminDashboard = () => {
               Create New
             </Button>
           </Box>
+          
+          {/* Search and filter controls */}
+          <Grid container spacing={2} sx={{ mb: 3 }}>
+            <Grid item xs={12} md={5}>
+              <TextField
+                fullWidth
+                variant="outlined"
+                placeholder="Search salary slips by employee, month, or year..."
+                value={salarySlipSearch}
+                onChange={(e) => setSalarySlipSearch(e.target.value)}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <SearchIcon />
+                    </InputAdornment>
+                  ),
+                }}
+              />
+            </Grid>
+            <Grid item xs={6} md={2}>
+              <TextField
+                select
+                fullWidth
+                label="Month"
+                value={salarySlipMonthFilter}
+                onChange={(e) => setSalarySlipMonthFilter(e.target.value)}
+                variant="outlined"
+              >
+                <MenuItem value="">All Months</MenuItem>
+                {['January', 'February', 'March', 'April', 'May', 'June', 
+                  'July', 'August', 'September', 'October', 'November', 'December'].map(month => (
+                  <MenuItem key={month} value={month}>
+                    {month}
+                  </MenuItem>
+                ))}
+              </TextField>
+            </Grid>
+            <Grid item xs={6} md={2}>
+              <TextField
+                select
+                fullWidth
+                label="Year"
+                value={salarySlipYearFilter}
+                onChange={(e) => setSalarySlipYearFilter(e.target.value)}
+                variant="outlined"
+              >
+                <MenuItem value="">All Years</MenuItem>
+                {getUniqueYears().map(year => (
+                  <MenuItem key={year} value={year.toString()}>
+                    {year}
+                  </MenuItem>
+                ))}
+              </TextField>
+            </Grid>
+            <Grid item xs={12} md={3} sx={{ display: 'flex', alignItems: 'center' }}>
+              <Button 
+                variant="outlined" 
+                onClick={resetSalarySlipFilters}
+                sx={{ ml: { md: 2 } }}
+                fullWidth
+              >
+                Reset Filters
+              </Button>
+            </Grid>
+          </Grid>
           
           {loading ? (
             <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}>
@@ -741,8 +1205,8 @@ const AdminDashboard = () => {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {Array.isArray(salarySlips) && salarySlips.length > 0 ? (
-                    salarySlips.map(slip => (
+                  {filteredSalarySlips.length > 0 ? (
+                    filteredSalarySlips.map(slip => (
                       <TableRow key={slip._id || slip.id}>
                         <TableCell>{slip.employeeName}</TableCell>
                         <TableCell>{`${slip.month}/${slip.year}`}</TableCell>
@@ -768,7 +1232,7 @@ const AdminDashboard = () => {
                   ) : (
                     <TableRow>
                       <TableCell colSpan={7} align="center">
-                        No salary slips found
+                        {salarySlipSearch ? 'No salary slips found matching your search' : 'No salary slips found'}
                       </TableCell>
                     </TableRow>
                   )}
@@ -784,6 +1248,23 @@ const AdminDashboard = () => {
             Expense Approvals
           </Typography>
           
+          {/* Add search field */}
+          <TextField
+            fullWidth
+            variant="outlined"
+            placeholder="Search expenses by employee, title, status..."
+            value={expenseSearch}
+            onChange={(e) => setExpenseSearch(e.target.value)}
+            sx={{ mb: 2 }}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon />
+                </InputAdornment>
+              ),
+            }}
+          />
+          
           <TableContainer component={Paper}>
             <Table>
               <TableHead>
@@ -797,327 +1278,626 @@ const AdminDashboard = () => {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {Array.isArray(expenses) && expenses.map(expense => (
-                  <TableRow key={expense.id}>
-                    <TableCell>{expense.employeeName}</TableCell>
-                    <TableCell>{expense.title}</TableCell>
-                    <TableCell>${expense.amount}</TableCell>
-                    <TableCell>{expense.date}</TableCell>
-                    <TableCell>
-                      <Box sx={{
-                        display: 'inline-block',
-                        px: 1,
-                        py: 0.5,
-                        borderRadius: 1,
-                        bgcolor: 
-                          expense.status === 'approved' ? 'success.light' :
-                          expense.status === 'rejected' ? 'error.light' : 
-                          'warning.light',
-                        color: 'white'
-                      }}>
-                        {expense.status}
-                      </Box>
-                    </TableCell>
-                    <TableCell>
-                      {expense.status === 'pending' && (
-                        <>
-                          <Button 
-                            size="small" 
-                            color="success" 
-                            onClick={() => approveExpense(expense.id)}
-                            sx={{ mr: 1 }}
-                          >
-                            Approve
-                          </Button>
-                          <Button 
-                            size="small" 
-                            color="error" 
-                            onClick={() => rejectExpense(expense.id)}
-                          >
-                            Reject
-                          </Button>
-                        </>
-                      )}
+                {filteredExpenses.length > 0 ? (
+                  filteredExpenses.map(expense => (
+                    <TableRow key={expense.id}>
+                      <TableCell>{expense.employeeName}</TableCell>
+                      <TableCell>{expense.title}</TableCell>
+                      <TableCell>${expense.amount}</TableCell>
+                      <TableCell>{formatDate(expense.date)}</TableCell>
+                      <TableCell>
+                        <Box sx={{
+                          display: 'inline-block',
+                          px: 1,
+                          py: 0.5,
+                          borderRadius: 1,
+                          bgcolor: 
+                            expense.status === 'approved' ? 'success.light' :
+                            expense.status === 'rejected' ? 'error.light' : 
+                            'warning.light',
+                          color: 'white'
+                        }}>
+                          {expense.status}
+                        </Box>
+                      </TableCell>
+                      <TableCell>
+                        {expense.status === 'pending' && (
+                          <>
+                            <Button 
+                              size="small" 
+                              color="success" 
+                              onClick={() => approveExpense(expense.id)}
+                              sx={{ mr: 1 }}
+                            >
+                              Approve
+                            </Button>
+                            <Button 
+                              size="small" 
+                              color="error" 
+                              onClick={() => rejectExpense(expense.id)}
+                            >
+                              Reject
+                            </Button>
+                          </>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={6} align="center">
+                      {expenseSearch ? 'No expenses found matching your search' : 'No expenses found'}
                     </TableCell>
                   </TableRow>
-                ))}
+                )}
               </TableBody>
             </Table>
           </TableContainer>
         </TabPanel>
+        
+        {/* Charts Tab */}
+        <TabPanel value={tabValue} index={4}>
+          <Typography variant="h5" gutterBottom>
+            Salary Analytics
+          </Typography>
+          
+          {loading ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}>
+              <CircularProgress />
+            </Box>
+          ) : (
+            <>
+              <Grid container spacing={3}>
+                {/* Department Salary Chart */}
+                <Grid item xs={12} md={6}>
+                  <Paper sx={{ p: 3 }}>
+                    <Typography variant="h6" gutterBottom>
+                      Average Salary by Department
+                    </Typography>
+                    <Box sx={{ height: 300 }}>
+                      <Bar 
+                        data={getDepartmentSalaries()}
+                        options={{
+                          responsive: true,
+                          maintainAspectRatio: false,
+                          plugins: {
+                            legend: {
+                              position: 'top',
+                            },
+                            title: {
+                              display: false,
+                            },
+                          },
+                        }}
+                      />
+                    </Box>
+                  </Paper>
+                </Grid>
+                
+                {/* Salary Distribution Chart */}
+                <Grid item xs={12} md={6}>
+                  <Paper sx={{ p: 3 }}>
+                    <Typography variant="h6" gutterBottom>
+                      Salary Distribution
+                    </Typography>
+                    <Box sx={{ height: 300, display: 'flex', justifyContent: 'center' }}>
+                      <Pie 
+                        data={getSalaryDistribution()}
+                        options={{
+                          responsive: true,
+                          maintainAspectRatio: false,
+                          plugins: {
+                            legend: {
+                              position: 'right',
+                            },
+                            title: {
+                              display: false,
+                            },
+                          },
+                        }}
+                      />
+                    </Box>
+                  </Paper>
+                </Grid>
+                
+                {/* Monthly Salary Expenses Chart */}
+                <Grid item xs={12}>
+                  <Paper sx={{ p: 3 }}>
+                    <Typography variant="h6" gutterBottom>
+                      Monthly Salary Expenditure
+                    </Typography>
+                    <Box sx={{ height: 300 }}>
+                      <Line 
+                        data={getMonthlySalaryTotals()}
+                        options={{
+                          responsive: true,
+                          maintainAspectRatio: false,
+                          plugins: {
+                            legend: {
+                              position: 'top',
+                            },
+                            title: {
+                              display: false,
+                            },
+                          },
+                          scales: {
+                            y: {
+                              beginAtZero: true,
+                              title: {
+                                display: true,
+                                text: 'Amount ($)'
+                            }
+                          }
+                        }
+                      }}
+                    />
+                  </Box>
+                </Paper>
+              </Grid>
+              
+              {/* Summary Stats */}
+              <Grid item xs={12} md={4}>
+                <Card>
+                  <CardContent>
+                    <Typography color="textSecondary" gutterBottom>
+                      Average Salary
+                    </Typography>
+                    <Typography variant="h4">
+                      ${employees.length > 0 
+                        ? (employees.reduce((sum, emp) => sum + (parseFloat(emp.salary) || 0), 0) / employees.length).toFixed(2) 
+                        : '0.00'}
+                    </Typography>
+                  </CardContent>
+                </Card>
+              </Grid>
+              
+              <Grid item xs={12} md={4}>
+                <Card>
+                  <CardContent>
+                    <Typography color="textSecondary" gutterBottom>
+                      Highest Salary
+                    </Typography>
+                    <Typography variant="h4">
+                      ${employees.length > 0 
+                        ? Math.max(...employees.map(emp => parseFloat(emp.salary) || 0)).toFixed(2) 
+                        : '0.00'}
+                    </Typography>
+                  </CardContent>
+                </Card>
+              </Grid>
+              
+              <Grid item xs={12} md={4}>
+                <Card>
+                  <CardContent>
+                    <Typography color="textSecondary" gutterBottom>
+                      Total Monthly Payroll
+                    </Typography>
+                    <Typography variant="h4">
+                      ${employees.reduce((sum, emp) => sum + (parseFloat(emp.salary) || 0), 0).toFixed(2)}
+                    </Typography>
+                  </CardContent>
+                </Card>
+              </Grid>
+            </Grid>
+            
+            {/* Expense Analytics Section */}
+            <Typography variant="h5" gutterBottom sx={{ mt: 5 }}>
+              Expense Analytics
+            </Typography>
+            
+            <Grid container spacing={3}>
+              {/* Expense Status Distribution Chart */}
+              <Grid item xs={12} md={6}>
+                <Paper sx={{ p: 3 }}>
+                  <Typography variant="h6" gutterBottom>
+                    Expense Status Distribution
+                  </Typography>
+                  <Box sx={{ height: 300, display: 'flex', justifyContent: 'center' }}>
+                    <Pie 
+                      data={getExpenseStatusDistribution()}
+                      options={{
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                          legend: {
+                            position: 'right',
+                          },
+                          title: {
+                            display: false,
+                          },
+                        },
+                      }}
+                    />
+                  </Box>
+                </Paper>
+              </Grid>
+              
+              {/* Expense Category Chart */}
+              <Grid item xs={12} md={6}>
+                <Paper sx={{ p: 3 }}>
+                  <Typography variant="h6" gutterBottom>
+                    Expenses by Category
+                  </Typography>
+                  <Box sx={{ height: 300 }}>
+                    <Bar 
+                      data={getExpensesByCategory()}
+                      options={{
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                          legend: {
+                            display: false,
+                          },
+                          title: {
+                            display: false,
+                          },
+                        },
+                        scales: {
+                          y: {
+                            beginAtZero: true,
+                            title: {
+                              display: true,
+                              text: 'Amount ($)'
+                            }
+                          }
+                        }
+                      }}
+                    />
+                  </Box>
+                </Paper>
+              </Grid>
+              
+              {/* Monthly Expense Trends Chart */}
+              <Grid item xs={12}>
+                <Paper sx={{ p: 3 }}>
+                  <Typography variant="h6" gutterBottom>
+                    Monthly Expense Trends ({new Date().getFullYear()})
+                  </Typography>
+                  <Box sx={{ height: 300 }}>
+                    <Line 
+                      data={getMonthlyExpenseTrends()}
+                      options={{
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                          legend: {
+                            position: 'top',
+                          },
+                          title: {
+                            display: false,
+                          },
+                        },
+                        scales: {
+                          y: {
+                            beginAtZero: true,
+                            title: {
+                              display: true,
+                              text: 'Amount ($)'
+                            }
+                          }
+                        }
+                      }}
+                    />
+                  </Box>
+                </Paper>
+              </Grid>
+              
+              {/* Expense Summary Stats */}
+              <Grid item xs={12} md={4}>
+                <Card>
+                  <CardContent>
+                    <Typography color="textSecondary" gutterBottom>
+                      Total Expenses
+                    </Typography>
+                    <Typography variant="h4">
+                      ${calculateTotalExpenses()}
+                    </Typography>
+                  </CardContent>
+                </Card>
+              </Grid>
+              
+              <Grid item xs={12} md={4}>
+                <Card>
+                  <CardContent>
+                    <Typography color="textSecondary" gutterBottom>
+                      Approved Expenses
+                    </Typography>
+                    <Typography variant="h4">
+                      ${calculateTotalExpenses('approved')}
+                    </Typography>
+                  </CardContent>
+                </Card>
+              </Grid>
+              
+              <Grid item xs={12} md={4}>
+                <Card>
+                  <CardContent>
+                    <Typography color="textSecondary" gutterBottom>
+                      Pending Approval
+                    </Typography>
+                    <Typography variant="h4">
+                      ${calculateTotalExpenses('pending')}
+                    </Typography>
+                  </CardContent>
+                </Card>
+              </Grid>
+            </Grid>
+              </>
+          )}
+        </TabPanel>
+        
+        {/* Edit Employee Dialog */}
+        <Dialog open={editEmployeeDialog} onClose={handleEditEmployeeDialogClose}>
+          <DialogTitle>Edit Employee</DialogTitle>
+          <DialogContent>
+            <Grid container spacing={2} sx={{ mt: 1 }}>
+              <Grid item xs={12}>
+                <TextField
+                  label="Name"
+                  value={editEmployeeForm.name}
+                  fullWidth
+                  disabled
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <TextField
+                  label="Email"
+                  value={editEmployeeForm.email}
+                  fullWidth
+                  disabled
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <TextField
+                  label="Department"
+                  name="department"
+                  value={editEmployeeForm.department}
+                  onChange={handleEditEmployeeFormChange}
+                  fullWidth
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <TextField
+                  label="Salary"
+                  name="salary"
+                  type="number"
+                  value={editEmployeeForm.salary}
+                  onChange={handleEditEmployeeFormChange}
+                  fullWidth
+                  InputProps={{
+                    startAdornment: '$'
+                  }}
+                />
+              </Grid>
+            </Grid>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={handleEditEmployeeDialogClose}>Cancel</Button>
+            <Button 
+              onClick={updateEmployee} 
+              variant="contained" 
+              disabled={loading}
+            >
+              {loading ? <CircularProgress size={24} /> : 'Update'}
+            </Button>
+          </DialogActions>
+        </Dialog>
+        
+        {/* Create Salary Slip Dialog */}
+        <Dialog open={dialogOpen} onClose={handleDialogClose} maxWidth="md" fullWidth>
+          <DialogTitle>Create New Salary Slip</DialogTitle>
+          <DialogContent>
+            <Grid container spacing={2} sx={{ mt: 1 }}>
+              <Grid item xs={12} md={6}>
+                <TextField
+                  select
+                  label="Employee"
+                  name="employeeId"
+                  value={salarySlipForm.employeeId}
+                  onChange={handleFormChange}
+                  fullWidth
+                  required
+                >
+                  {employees.map(employee => (
+                    <MenuItem key={employee.id} value={employee.id}>
+                      {employee.name} - {employee.department} 
+                    </MenuItem>
+                  ))}
+                </TextField>
+              </Grid>
+              <Grid item xs={12} md={3}>
+                <TextField
+                  select
+                  label="Month"
+                  name="month"
+                  value={salarySlipForm.month}
+                  onChange={handleFormChange}
+                  fullWidth
+                  required
+                >
+                  {['January', 'February', 'March', 'April', 'May', 'June', 
+                    'July', 'August', 'September', 'October', 'November', 'December'].map(month => (
+                    <MenuItem key={month} value={month}>
+                      {month}
+                    </MenuItem>
+                  ))}
+                </TextField>
+              </Grid>
+              <Grid item xs={12} md={3}>
+                <TextField
+                  label="Year"
+                  name="year"
+                  type="number"
+                  value={salarySlipForm.year}
+                  onChange={handleFormChange}
+                  fullWidth
+                  required
+                />
+              </Grid>
+              <Grid item xs={12} md={4}>
+                <TextField
+                  label="Basic Salary"
+                  name="basicSalary"
+                  type="number"
+                  value={salarySlipForm.basicSalary}
+                  onChange={handleFormChange}
+                  fullWidth
+                  required
+                  InputProps={{
+                    startAdornment: '$'
+                  }}
+                />
+              </Grid>
+              <Grid item xs={12} md={4}>
+                <TextField
+                  label="Allowances"
+                  name="allowances"
+                  type="number"
+                  value={salarySlipForm.allowances}
+                  onChange={handleFormChange}
+                  fullWidth
+                  InputProps={{
+                    startAdornment: '$'
+                  }}
+                />
+              </Grid>
+              <Grid item xs={12} md={4}>
+                <TextField
+                  label="Deductions"
+                  name="deductions"
+                  type="number"
+                  value={salarySlipForm.deductions}
+                  onChange={handleFormChange}
+                  fullWidth
+                  InputProps={{
+                    startAdornment: '$'
+                  }}
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <Paper sx={{ p: 2, bgcolor: 'background.default' }}>
+                  <Typography variant="subtitle1">
+                    Net Salary: ${calculateNetSalary()}
+                  </Typography>
+                </Paper>
+              </Grid>
+            </Grid>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={handleDialogClose}>Cancel</Button>
+            <Button 
+              onClick={createSalarySlip} 
+              variant="contained" 
+              disabled={loading || !salarySlipForm.employeeId || !salarySlipForm.month || !salarySlipForm.basicSalary}
+            >
+              {loading ? <CircularProgress size={24} /> : 'Create'}
+            </Button>
+          </DialogActions>
+        </Dialog>
+        
+        {/* Edit Salary Slip Dialog */}
+        <Dialog open={editSalarySlipDialog} onClose={handleEditSalarySlipDialogClose} maxWidth="md" fullWidth>
+          <DialogTitle>Edit Salary Slip</DialogTitle>
+          <DialogContent>
+            <Grid container spacing={2} sx={{ mt: 1 }}>
+              <Grid item xs={12} md={6}>
+                <TextField
+                  label="Employee"
+                  value={editSalarySlipForm.employeeName}
+                  fullWidth
+                  disabled
+                />
+              </Grid>
+              <Grid item xs={12} md={3}>
+                <TextField
+                  select
+                  label="Month"
+                  name="month"
+                  value={editSalarySlipForm.month}
+                  onChange={handleEditSalarySlipFormChange}
+                  fullWidth
+                  required
+                >
+                  {['January', 'February', 'March', 'April', 'May', 'June', 
+                    'July', 'August', 'September', 'October', 'November', 'December'].map(month => (
+                    <MenuItem key={month} value={month}>
+                      {month}
+                    </MenuItem>
+                  ))}
+                </TextField>
+              </Grid>
+              <Grid item xs={12} md={3}>
+                <TextField
+                  label="Year"
+                  name="year"
+                  type="number"
+                  value={editSalarySlipForm.year}
+                  onChange={handleEditSalarySlipFormChange}
+                  fullWidth
+                  required
+                />
+              </Grid>
+              <Grid item xs={12} md={4}>
+                <TextField
+                  label="Basic Salary"
+                  name="basicSalary"
+                  type="number"
+                  value={editSalarySlipForm.basicSalary}
+                  onChange={handleEditSalarySlipFormChange}
+                  fullWidth
+                  required
+                  InputProps={{
+                    startAdornment: '$'
+                  }}
+                />
+              </Grid>
+              <Grid item xs={12} md={4}>
+                <TextField
+                  label="Allowances"
+                  name="allowances"
+                  type="number"
+                  value={editSalarySlipForm.allowances}
+                  onChange={handleEditSalarySlipFormChange}
+                  fullWidth
+                  InputProps={{
+                    startAdornment: '$'
+                  }}
+                />
+              </Grid>
+              <Grid item xs={12} md={4}>
+                <TextField
+                  label="Deductions"
+                  name="deductions"
+                  type="number"
+                  value={editSalarySlipForm.deductions}
+                  onChange={handleEditSalarySlipFormChange}
+                  fullWidth
+                  InputProps={{
+                    startAdornment: '$'
+                  }}
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <Paper sx={{ p: 2, bgcolor: 'background.default' }}>
+                  <Typography variant="subtitle1">
+                    Net Salary: ${calculateEditNetSalary()}
+                  </Typography>
+                </Paper>
+              </Grid>
+            </Grid>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={handleEditSalarySlipDialogClose}>Cancel</Button>
+            <Button 
+              onClick={updateSalarySlip} 
+              variant="contained" 
+              disabled={loading}
+            >
+              {loading ? <CircularProgress size={24} /> : 'Update'}
+            </Button>
+          </DialogActions>
+        </Dialog>
       </Box>
-      
-      {/* Edit Employee Dialog */}
-      <Dialog open={editEmployeeDialog} onClose={handleEditEmployeeDialogClose}>
-        <DialogTitle>Edit Employee</DialogTitle>
-        <DialogContent>
-          <Grid container spacing={2} sx={{ mt: 1 }}>
-            <Grid item xs={12}>
-              <TextField
-                label="Name"
-                value={editEmployeeForm.name}
-                fullWidth
-                disabled
-              />
-            </Grid>
-            <Grid item xs={12}>
-              <TextField
-                label="Email"
-                value={editEmployeeForm.email}
-                fullWidth
-                disabled
-              />
-            </Grid>
-            <Grid item xs={12}>
-              <TextField
-                label="Department"
-                name="department"
-                value={editEmployeeForm.department}
-                onChange={handleEditEmployeeFormChange}
-                fullWidth
-              />
-            </Grid>
-            <Grid item xs={12}>
-              <TextField
-                label="Salary"
-                name="salary"
-                type="number"
-                value={editEmployeeForm.salary}
-                onChange={handleEditEmployeeFormChange}
-                fullWidth
-                InputProps={{
-                  startAdornment: '$'
-                }}
-              />
-            </Grid>
-          </Grid>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleEditEmployeeDialogClose}>Cancel</Button>
-          <Button 
-            onClick={updateEmployee} 
-            variant="contained" 
-            disabled={loading}
-          >
-            {loading ? <CircularProgress size={24} /> : 'Update'}
-          </Button>
-        </DialogActions>
-      </Dialog>
-      
-      {/* Create Salary Slip Dialog */}
-      <Dialog open={dialogOpen} onClose={handleDialogClose} maxWidth="md" fullWidth>
-        <DialogTitle>Create New Salary Slip</DialogTitle>
-        <DialogContent>
-          <Grid container spacing={2} sx={{ mt: 1 }}>
-            <Grid item xs={12} md={6}>
-              <TextField
-                select
-                label="Employee"
-                name="employeeId"
-                value={salarySlipForm.employeeId}
-                onChange={handleFormChange}
-                fullWidth
-                required
-              >
-                {employees.map(employee => (
-                  <MenuItem key={employee.id} value={employee.id}>
-                    {employee.name} - {employee.department} 
-                  </MenuItem>
-                ))}
-              </TextField>
-            </Grid>
-            <Grid item xs={12} md={3}>
-              <TextField
-                select
-                label="Month"
-                name="month"
-                value={salarySlipForm.month}
-                onChange={handleFormChange}
-                fullWidth
-                required
-              >
-                {['January', 'February', 'March', 'April', 'May', 'June', 
-                  'July', 'August', 'September', 'October', 'November', 'December'].map(month => (
-                  <MenuItem key={month} value={month}>
-                    {month}
-                  </MenuItem>
-                ))}
-              </TextField>
-            </Grid>
-            <Grid item xs={12} md={3}>
-              <TextField
-                label="Year"
-                name="year"
-                type="number"
-                value={salarySlipForm.year}
-                onChange={handleFormChange}
-                fullWidth
-                required
-              />
-            </Grid>
-            <Grid item xs={12} md={4}>
-              <TextField
-                label="Basic Salary"
-                name="basicSalary"
-                type="number"
-                value={salarySlipForm.basicSalary}
-                onChange={handleFormChange}
-                fullWidth
-                required
-                InputProps={{
-                  startAdornment: '$'
-                }}
-              />
-            </Grid>
-            <Grid item xs={12} md={4}>
-              <TextField
-                label="Allowances"
-                name="allowances"
-                type="number"
-                value={salarySlipForm.allowances}
-                onChange={handleFormChange}
-                fullWidth
-                InputProps={{
-                  startAdornment: '$'
-                }}
-              />
-            </Grid>
-            <Grid item xs={12} md={4}>
-              <TextField
-                label="Deductions"
-                name="deductions"
-                type="number"
-                value={salarySlipForm.deductions}
-                onChange={handleFormChange}
-                fullWidth
-                InputProps={{
-                  startAdornment: '$'
-                }}
-              />
-            </Grid>
-            <Grid item xs={12}>
-              <Paper sx={{ p: 2, bgcolor: 'background.default' }}>
-                <Typography variant="subtitle1">
-                  Net Salary: ${calculateNetSalary()}
-                </Typography>
-              </Paper>
-            </Grid>
-          </Grid>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleDialogClose}>Cancel</Button>
-          <Button 
-            onClick={createSalarySlip} 
-            variant="contained" 
-            disabled={loading || !salarySlipForm.employeeId || !salarySlipForm.month || !salarySlipForm.basicSalary}
-          >
-            {loading ? <CircularProgress size={24} /> : 'Create'}
-          </Button>
-        </DialogActions>
-      </Dialog>
-      
-      {/* Edit Salary Slip Dialog */}
-      <Dialog open={editSalarySlipDialog} onClose={handleEditSalarySlipDialogClose} maxWidth="md" fullWidth>
-        <DialogTitle>Edit Salary Slip</DialogTitle>
-        <DialogContent>
-          <Grid container spacing={2} sx={{ mt: 1 }}>
-            <Grid item xs={12} md={6}>
-              <TextField
-                label="Employee"
-                value={editSalarySlipForm.employeeName}
-                fullWidth
-                disabled
-              />
-            </Grid>
-            <Grid item xs={12} md={3}>
-              <TextField
-                select
-                label="Month"
-                name="month"
-                value={editSalarySlipForm.month}
-                onChange={handleEditSalarySlipFormChange}
-                fullWidth
-                required
-              >
-                {['January', 'February', 'March', 'April', 'May', 'June', 
-                  'July', 'August', 'September', 'October', 'November', 'December'].map(month => (
-                  <MenuItem key={month} value={month}>
-                    {month}
-                  </MenuItem>
-                ))}
-              </TextField>
-            </Grid>
-            <Grid item xs={12} md={3}>
-              <TextField
-                label="Year"
-                name="year"
-                type="number"
-                value={editSalarySlipForm.year}
-                onChange={handleEditSalarySlipFormChange}
-                fullWidth
-                required
-              />
-            </Grid>
-            <Grid item xs={12} md={4}>
-              <TextField
-                label="Basic Salary"
-                name="basicSalary"
-                type="number"
-                value={editSalarySlipForm.basicSalary}
-                onChange={handleEditSalarySlipFormChange}
-                fullWidth
-                required
-                InputProps={{
-                  startAdornment: '$'
-                }}
-              />
-            </Grid>
-            <Grid item xs={12} md={4}>
-              <TextField
-                label="Allowances"
-                name="allowances"
-                type="number"
-                value={editSalarySlipForm.allowances}
-                onChange={handleEditSalarySlipFormChange}
-                fullWidth
-                InputProps={{
-                  startAdornment: '$'
-                }}
-              />
-            </Grid>
-            <Grid item xs={12} md={4}>
-              <TextField
-                label="Deductions"
-                name="deductions"
-                type="number"
-                value={editSalarySlipForm.deductions}
-                onChange={handleEditSalarySlipFormChange}
-                fullWidth
-                InputProps={{
-                  startAdornment: '$'
-                }}
-              />
-            </Grid>
-            <Grid item xs={12}>
-              <Paper sx={{ p: 2, bgcolor: 'background.default' }}>
-                <Typography variant="subtitle1">
-                  Net Salary: ${calculateEditNetSalary()}
-                </Typography>
-              </Paper>
-            </Grid>
-          </Grid>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleEditSalarySlipDialogClose}>Cancel</Button>
-          <Button 
-            onClick={updateSalarySlip} 
-            variant="contained" 
-            disabled={loading}
-          >
-            {loading ? <CircularProgress size={24} /> : 'Update'}
-          </Button>
-        </DialogActions>
-      </Dialog>
     </Box>
   );
 };

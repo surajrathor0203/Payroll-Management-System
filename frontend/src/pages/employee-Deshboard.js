@@ -35,7 +35,8 @@ import {
   Alert,
   FormControl,
   InputLabel,
-  Select
+  Select,
+  InputAdornment
 } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
 import DashboardIcon from '@mui/icons-material/Dashboard';
@@ -44,6 +45,7 @@ import LogoutIcon from '@mui/icons-material/Logout';
 import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
 import AddIcon from '@mui/icons-material/Add';
 import DownloadIcon from '@mui/icons-material/Download';
+import SearchIcon from '@mui/icons-material/Search';
 
 const API_URL = 'http://localhost:5001/api';
 
@@ -81,6 +83,9 @@ const EmployeeDashboard = () => {
     salary: 0,
     department: 'Not assigned'
   });
+  // Add search state variables
+  const [salarySlipSearch, setSalarySlipSearch] = useState('');
+  const [expenseSearch, setExpenseSearch] = useState('');
   // Add missing expenseForm state
   const [expenseForm, setExpenseForm] = useState({
     title: '',
@@ -380,6 +385,37 @@ const EmployeeDashboard = () => {
     </Box>
   );
 
+  // Filtered data functions
+  const filteredSalarySlips = Array.isArray(salarySlips) ? salarySlips.filter(slip => 
+    (slip.month && slip.month.toLowerCase().includes(salarySlipSearch.toLowerCase())) ||
+    (slip.year && slip.year.toString().includes(salarySlipSearch)) ||
+    (slip.netSalary && slip.netSalary.toString().includes(salarySlipSearch))
+  ) : [];
+
+  const filteredExpenses = Array.isArray(expenses) ? expenses.filter(expense => 
+    (expense.title && expense.title.toLowerCase().includes(expenseSearch.toLowerCase())) ||
+    (expense.category && expense.category.toLowerCase().includes(expenseSearch.toLowerCase())) ||
+    (expense.amount && expense.amount.toString().includes(expenseSearch)) ||
+    (expense.status && expense.status.toLowerCase().includes(expenseSearch.toLowerCase())) ||
+    (expense.date && expense.date.includes(expenseSearch))
+  ) : [];
+
+  // Add a helper function to format dates
+  const formatDate = (dateString) => {
+    if (!dateString) return '';
+    
+    // Try parsing the date string to ensure it's valid
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return dateString; // Return original if invalid
+    
+    // Format as DD/MM/YYYY
+    const day = date.getDate().toString().padStart(2, '0');
+    const month = (date.getMonth() + 1).toString().padStart(2, '0'); // Months are 0-indexed
+    const year = date.getFullYear();
+    
+    return `${day}/${month}/${year}`;
+  };
+  
   return (
     <Box sx={{ display: 'flex' }}>
       <AppBar position="fixed">
@@ -444,6 +480,23 @@ const EmployeeDashboard = () => {
             Your Salary History
           </Typography>
           
+          {/* Add search field */}
+          <TextField
+            fullWidth
+            variant="outlined"
+            placeholder="Search by month, year, or amount..."
+            value={salarySlipSearch}
+            onChange={(e) => setSalarySlipSearch(e.target.value)}
+            sx={{ mb: 2 }}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon />
+                </InputAdornment>
+              ),
+            }}
+          />
+          
           {loading ? (
             <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}>
               <CircularProgress />
@@ -463,8 +516,8 @@ const EmployeeDashboard = () => {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {Array.isArray(salarySlips) && salarySlips.length > 0 ? (
-                    salarySlips.map(slip => (
+                  {filteredSalarySlips.length > 0 ? (
+                    filteredSalarySlips.map(slip => (
                       <TableRow key={slip._id || slip.id}>
                         <TableCell>{`${slip.month}/${slip.year}`}</TableCell>
                         <TableCell>${slip.basicSalary}</TableCell>
@@ -497,7 +550,7 @@ const EmployeeDashboard = () => {
                   ) : (
                     <TableRow>
                       <TableCell colSpan={7} align="center">
-                        No salary slips found
+                        {salarySlipSearch ? 'No salary slips found matching your search' : 'No salary slips found'}
                       </TableCell>
                     </TableRow>
                   )}
@@ -607,6 +660,23 @@ const EmployeeDashboard = () => {
             </Button>
           </Box>
           
+          {/* Add search field */}
+          <TextField
+            fullWidth
+            variant="outlined"
+            placeholder="Search expenses by title, category, date or status..."
+            value={expenseSearch}
+            onChange={(e) => setExpenseSearch(e.target.value)}
+            sx={{ mb: 2 }}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon />
+                </InputAdornment>
+              ),
+            }}
+          />
+          
           <TableContainer component={Paper}>
             <Table>
               <TableHead>
@@ -620,30 +690,38 @@ const EmployeeDashboard = () => {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {Array.isArray(expenses) && expenses.map(expense => (
-                  <TableRow key={expense.id}>
-                    <TableCell>{expense.title}</TableCell>
-                    <TableCell>${expense.amount}</TableCell>
-                    <TableCell>{expense.date}</TableCell>
-                    <TableCell>{expense.category}</TableCell>
-                    <TableCell>
-                      <Box sx={{
-                        display: 'inline-block',
-                        px: 1,
-                        py: 0.5,
-                        borderRadius: 1,
-                        bgcolor: 
-                          expense.status === 'approved' ? 'success.light' :
-                          expense.status === 'rejected' ? 'error.light' : 
-                          'warning.light',
-                        color: 'white'
-                      }}>
-                        {expense.status}
-                      </Box>
+                {filteredExpenses.length > 0 ? (
+                  filteredExpenses.map(expense => (
+                    <TableRow key={expense.id}>
+                      <TableCell>{expense.title}</TableCell>
+                      <TableCell>${expense.amount}</TableCell>
+                      <TableCell>{formatDate(expense.date)}</TableCell>
+                      <TableCell>{expense.category}</TableCell>
+                      <TableCell>
+                        <Box sx={{
+                          display: 'inline-block',
+                          px: 1,
+                          py: 0.5,
+                          borderRadius: 1,
+                          bgcolor: 
+                            expense.status === 'approved' ? 'success.light' :
+                            expense.status === 'rejected' ? 'error.light' : 
+                            'warning.light',
+                          color: 'white'
+                        }}>
+                          {expense.status}
+                        </Box>
+                      </TableCell>
+                      <TableCell>{expense.description}</TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={6} align="center">
+                      {expenseSearch ? 'No expenses found matching your search' : 'No expenses found'}
                     </TableCell>
-                    <TableCell>{expense.description}</TableCell>
                   </TableRow>
-                ))}
+                )}
               </TableBody>
             </Table>
           </TableContainer>
