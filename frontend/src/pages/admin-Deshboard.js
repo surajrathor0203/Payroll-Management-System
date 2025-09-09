@@ -1200,7 +1200,7 @@ const AdminDashboard = () => {
               <Card>
                 <CardContent>
                   <Typography color="textSecondary" gutterBottom>
-                    Salary Slips (Current Month)
+                    Salary Slips
                   </Typography>
                   <Typography variant="h3">
                     {salarySlips.length}
