@@ -80,7 +80,7 @@ ChartJS.register(
 );
 
 // Define API_URL constant - this was missing and causing the errors
-const API_URL = 'http://localhost:5001/api';
+const API_URL = `${process.env.REACT_APP_BACKEND_URL || 'http://localhost:5001'}/api`;
 
 // Custom TabPanel component
 function TabPanel(props) {

@@ -1,7 +1,11 @@
 import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
 import axios from 'axios';
 
-const API_URL = 'http://localhost:5001/api';
+// Use environment variable with fallback
+const API_URL = `${process.env.REACT_APP_BACKEND_URL || 'http://localhost:5001'}/api`;
+
+// Set axios defaults
+axios.defaults.baseURL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:5001';
 
 const AuthContext = createContext();
 
@@ -64,6 +68,7 @@ export const AuthProvider = ({ children }) => {
         return { success: false, message: response.data.message };
       }
     } catch (error) {
+      console.error('Login error:', error);
       const message = error.response?.data?.message || 'Login failed. Please try again.';
       setError(message);
       return { success: false, message };

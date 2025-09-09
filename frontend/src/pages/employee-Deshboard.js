@@ -48,7 +48,7 @@ import AddIcon from '@mui/icons-material/Add';
 import DownloadIcon from '@mui/icons-material/Download';
 import SearchIcon from '@mui/icons-material/Search';
 
-const API_URL = 'http://localhost:5001/api';
+const API_URL = `${process.env.REACT_APP_BACKEND_URL || 'http://localhost:5001'}/api`;
 
 // Custom TabPanel component
 function TabPanel(props) {
