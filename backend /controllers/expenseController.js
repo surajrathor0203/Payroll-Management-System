@@ -1,5 +1,11 @@
 import Expense from '../models/expenseModel.js';
 import User from '../models/userModel.js';
+import { 
+  sendExpenseSubmissionAdminEmail, 
+  sendExpenseSubmissionEmployeeEmail,
+  sendExpenseApprovalEmail,
+  sendExpenseRejectionEmail 
+} from '../utils/emailService.js';
 
 // Submit a new expense
 export const submitExpense = async (req, res) => {
@@ -8,11 +14,13 @@ export const submitExpense = async (req, res) => {
     
     // Get employee name
     const employee = await User.findById(req.user.uid);
+    const employeeName = employee ? employee.fullName : 'Unknown Employee';
+    const employeeEmail = employee ? employee.email : '';
     
     // Create expense in MongoDB
     const newExpense = new Expense({
       employeeId: req.user.uid,
-      employeeName: employee ? employee.fullName : 'Unknown Employee',
+      employeeName: employeeName,
       title,
       amount,
       date,
@@ -37,7 +45,41 @@ export const submitExpense = async (req, res) => {
       status: savedExpense.status
     };
     
+    // Send the response before sending emails
     res.status(201).json(formattedExpense);
+    
+    // Find admin email to send notification
+    const admins = await User.find({ role: 'admin' });
+    
+    // Send email notifications asynchronously after response
+    if (admins.length > 0) {
+      // Send to the first admin found
+      try {
+        await sendExpenseSubmissionAdminEmail(
+          admins[0].email,
+          employeeName,
+          formattedExpense
+        );
+        console.log('Admin notification email sent successfully');
+      } catch (emailError) {
+        console.error('Error sending admin notification email:', emailError);
+      }
+    }
+    
+    // Send confirmation to the employee
+    if (employeeEmail) {
+      try {
+        await sendExpenseSubmissionEmployeeEmail(
+          employeeEmail,
+          employeeName,
+          formattedExpense
+        );
+        console.log('Employee confirmation email sent successfully');
+      } catch (emailError) {
+        console.error('Error sending employee confirmation email:', emailError);
+      }
+    }
+    
   } catch (error) {
     console.error('Submit expense error:', error);
     res.status(500).json({
@@ -133,8 +175,25 @@ export const approveExpense = async (req, res) => {
       description: expense.description,
       status: expense.status
     };
-    
+
+    // Send response before email
     res.status(200).json(formattedExpense);
+
+    // Send email notification to employee about approval
+    try {
+      const employee = await User.findById(expense.employeeId);
+      if (employee && employee.email) {
+        await sendExpenseApprovalEmail(
+          employee.email,
+          expense.employeeName,
+          formattedExpense
+        );
+        console.log('Expense approval email sent successfully');
+      }
+    } catch (emailError) {
+      console.error('Error sending expense approval email:', emailError);
+    }
+    
   } catch (error) {
     console.error('Approve expense error:', error);
     res.status(500).json({
@@ -175,7 +234,24 @@ export const rejectExpense = async (req, res) => {
       status: expense.status
     };
     
+    // Send response before email
     res.status(200).json(formattedExpense);
+    
+    // Send email notification to employee about rejection
+    try {
+      const employee = await User.findById(expense.employeeId);
+      if (employee && employee.email) {
+        await sendExpenseRejectionEmail(
+          employee.email,
+          expense.employeeName,
+          formattedExpense
+        );
+        console.log('Expense rejection email sent successfully');
+      }
+    } catch (emailError) {
+      console.error('Error sending expense rejection email:', emailError);
+    }
+    
   } catch (error) {
     console.error('Reject expense error:', error);
     res.status(500).json({

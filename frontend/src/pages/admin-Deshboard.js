@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import {
-  Box, 
-  Typography, 
-  AppBar, 
-  Toolbar, 
+  Box,
+  Typography,
+  AppBar,
+  Toolbar,
   IconButton,
   Button,
   Drawer,
@@ -26,6 +26,7 @@ import {
   Dialog,
   DialogActions,
   DialogContent,
+  DialogContentText,
   DialogTitle,
   TextField,
   MenuItem,
@@ -33,12 +34,17 @@ import {
   Tabs,
   CircularProgress,
   Alert,
-  InputAdornment
+  FormControl,
+  InputLabel,
+  Select,
+  InputAdornment,
+  Snackbar
 } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import PeopleIcon from '@mui/icons-material/People';
 import ReceiptIcon from '@mui/icons-material/Receipt';
+import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
 import LogoutIcon from '@mui/icons-material/Logout';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
@@ -148,6 +154,21 @@ const AdminDashboard = () => {
   // Add filter state variables
   const [salarySlipMonthFilter, setSalarySlipMonthFilter] = useState('');
   const [salarySlipYearFilter, setSalarySlipYearFilter] = useState('');
+
+  // Add notification state
+  const [notification, setNotification] = useState({
+    open: false,
+    message: '',
+    severity: 'success'
+  });
+  
+  // Add confirmation dialog state
+  const [confirmDialog, setConfirmDialog] = useState({
+    open: false,
+    title: '',
+    message: '',
+    onConfirm: null
+  });
 
   useEffect(() => {
     // Fetch data
@@ -284,115 +305,187 @@ const AdminDashboard = () => {
   };
 
   const createSalarySlip = async () => {
-    setLoading(true);
-    setError('');
-    
-    try {
-      const netSalary = calculateNetSalary();
-      
-      const response = await fetch(`${API_URL}/salary-slip`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify({
-          ...salarySlipForm,
-          netSalary
-        })
-      });
-      
-      if (!response.ok) {
-        throw new Error('Failed to create salary slip');
-      }
-      
-      // Close the dialog first to improve UX
-      setDialogOpen(false);
-      
-      // Reset form
-      setSalarySlipForm({
-        employeeId: '',
-        month: '',
-        year: new Date().getFullYear(),
-        basicSalary: '',
-        allowances: '',
-        deductions: '',
-        netSalary: ''
-      });
-      
-      // Refresh salary slips data after creation
-      await fetchSalarySlips();
-      
-      // Show success message
-      setError('');
-    } catch (error) {
-      setError('Failed to create salary slip: ' + error.message);
-      console.error(error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const approveExpense = async (id) => {
-    try {
-      setLoading(true);
-      const response = await fetch(`${API_URL}/expense/${id}/approve`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+    // Open confirmation dialog
+    setConfirmDialog({
+      open: true,
+      title: 'Create Salary Slip',
+      message: 'Are you sure you want to create this salary slip? An email notification will be sent to the employee.',
+      onConfirm: async () => {
+        try {
+          setLoading(true);
+          
+          // Calculate net salary if not already set
+          const netSalary = salarySlipForm.netSalary || calculateNetSalary();
+          
+          const response = await fetch(`${API_URL}/salary-slip`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${localStorage.getItem('token')}`
+            },
+            body: JSON.stringify({
+              ...salarySlipForm,
+              netSalary
+            })
+          });
+          
+          if (!response.ok) {
+            throw new Error('Failed to create salary slip');
+          }
+          
+          const data = await response.json();
+          
+          // Add the new salary slip to the list
+          setSalarySlips([data, ...salarySlips]);
+          
+          // Reset form
+          setSalarySlipForm({
+            employeeId: '',
+            month: '',
+            year: new Date().getFullYear(),
+            basicSalary: '',
+            allowances: '',
+            deductions: '',
+            netSalary: ''
+          });
+          
+          // Close dialog
+          setDialogOpen(false);
+          
+          // Show success notification
+          setNotification({
+            open: true,
+            message: 'Salary slip created successfully! Email notification sent to employee.',
+            severity: 'success'
+          });
+        } catch (error) {
+          console.error('Error creating salary slip:', error);
+          setNotification({
+            open: true,
+            message: 'Failed to create salary slip: ' + error.message,
+            severity: 'error'
+          });
+        } finally {
+          setLoading(false);
         }
-      });
-      
-      if (!response.ok) {
-        throw new Error('Failed to approve expense');
       }
-      
-      // Refresh expenses data after approval
-      await fetchExpenses();
-      
-      // Show success message
-      setError('');
-    } catch (error) {
-      setError('Failed to approve expense');
-      console.error(error);
-    } finally {
-      setLoading(false);
-    }
+    });
+  };
+  
+  const approveExpense = async (id) => {
+    // Open confirmation dialog
+    setConfirmDialog({
+      open: true,
+      title: 'Approve Expense',
+      message: 'Are you sure you want to approve this expense?',
+      onConfirm: async () => {
+        try {
+          setLoading(true);
+          
+          const response = await fetch(`${API_URL}/expense/${id}/approve`, {
+            method: 'PUT',
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('token')}`
+            }
+          });
+          
+          if (!response.ok) {
+            throw new Error('Failed to approve expense');
+          }
+          
+          const updatedExpense = await response.json();
+          
+          // Update the expense in the list
+          setExpenses(expenses.map(exp => 
+            exp.id === id ? updatedExpense : exp
+          ));
+          
+          // Show success notification
+          setNotification({
+            open: true,
+            message: 'Expense approved successfully! Email notification sent.',
+            severity: 'success'
+          });
+        } catch (error) {
+          console.error('Error approving expense:', error);
+          setNotification({
+            open: true,
+            message: 'Failed to approve expense: ' + error.message,
+            severity: 'error'
+          });
+        } finally {
+          setLoading(false);
+        }
+      }
+    });
   };
 
   const rejectExpense = async (id) => {
-    try {
-      setLoading(true);
-      const response = await fetch(`${API_URL}/expense/${id}/reject`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+    // Open confirmation dialog
+    setConfirmDialog({
+      open: true,
+      title: 'Reject Expense',
+      message: 'Are you sure you want to reject this expense?',
+      onConfirm: async () => {
+        try {
+          setLoading(true);
+          
+          const response = await fetch(`${API_URL}/expense/${id}/reject`, {
+            method: 'PUT',
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('token')}`
+            }
+          });
+          
+          if (!response.ok) {
+            throw new Error('Failed to reject expense');
+          }
+          
+          const updatedExpense = await response.json();
+          
+          // Update the expense in the list
+          setExpenses(expenses.map(exp => 
+            exp.id === id ? updatedExpense : exp
+          ));
+          
+          // Show success notification
+          setNotification({
+            open: true,
+            message: 'Expense rejected successfully! Email notification sent.',
+            severity: 'success'
+          });
+        } catch (error) {
+          console.error('Error rejecting expense:', error);
+          setNotification({
+            open: true,
+            message: 'Failed to reject expense: ' + error.message,
+            severity: 'error'
+          });
+        } finally {
+          setLoading(false);
         }
-      });
-      
-      if (!response.ok) {
-        throw new Error('Failed to reject expense');
       }
-      
-      // Refresh expenses data after rejection
-      await fetchExpenses();
-      
-      // Show success message
-      setError('');
-    } catch (error) {
-      setError('Failed to reject expense');
-      console.error(error);
-    } finally {
-      setLoading(false);
-    }
+    });
   };
 
   const handleEditEmployeeDialogOpen = (employee) => {
+    // Ensure we have a valid employee object
+    if (!employee || !employee.id) {
+      console.error('Invalid employee data:', employee);
+      setNotification({
+        open: true,
+        message: 'Cannot edit employee: Invalid data',
+        severity: 'error'
+      });
+      return;
+    }
+    
+    console.log('Opening edit dialog for employee:', employee);
     setEditEmployeeForm({
       id: employee.id,
       name: employee.name,
       email: employee.email,
-      department: employee.department || '',
+      department: employee.department || 'Not assigned',
       salary: employee.salary || 0
     });
     setEditEmployeeDialog(true);
@@ -411,40 +504,67 @@ const AdminDashboard = () => {
   };
 
   const updateEmployee = async () => {
-    setLoading(true);
-    setError('');
-    
-    try {
-      const response = await fetch(`${API_URL}/auth/employees/${editEmployeeForm.id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify({
-          department: editEmployeeForm.department,
-          salary: parseFloat(editEmployeeForm.salary)
-        })
-      });
-      
-      if (!response.ok) {
-        throw new Error('Failed to update employee');
+    // Open confirmation dialog
+    setConfirmDialog({
+      open: true,
+      title: 'Update Employee',
+      message: 'Are you sure you want to update this employee information?',
+      onConfirm: async () => {
+        try {
+          setLoading(true);
+          
+          console.log('Making API request to:', `${API_URL}/auth/employees/${editEmployeeForm.id}`);
+          console.log('Request payload:', {
+            department: editEmployeeForm.department,
+            salary: Number(editEmployeeForm.salary)
+          });
+          
+          const response = await fetch(`${API_URL}/auth/employees/${editEmployeeForm.id}`, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${localStorage.getItem('token')}`
+            },
+            body: JSON.stringify({
+              department: editEmployeeForm.department,
+              salary: Number(editEmployeeForm.salary)
+            })
+          });
+          
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            const errorMessage = errorData.message || `Failed to update employee (Status: ${response.status})`;
+            throw new Error(errorMessage);
+          }
+          
+          const data = await response.json();
+          
+          // Update employee in the list
+          setEmployees(employees.map(emp => 
+            emp.id === editEmployeeForm.id ? data.employee : emp
+          ));
+          
+          // Close dialog
+          setEditEmployeeDialog(false);
+          
+          // Show success notification
+          setNotification({
+            open: true,
+            message: 'Employee updated successfully! Email notification sent.',
+            severity: 'success'
+          });
+        } catch (error) {
+          console.error('Error updating employee:', error);
+          setNotification({
+            open: true,
+            message: 'Failed to update employee: ' + (error.message || 'Unknown error'),
+            severity: 'error'
+          });
+        } finally {
+          setLoading(false);
+        }
       }
-      
-      // Close the dialog first to improve UX
-      setEditEmployeeDialog(false);
-      
-      // Refresh all data after update
-      await fetchEmployees();
-      
-      // Show success message
-      setError('');
-    } catch (error) {
-      setError('Failed to update employee: ' + error.message);
-      console.error(error);
-    } finally {
-      setLoading(false);
-    }
+    });
   };
 
   // Handle opening the edit salary slip dialog
@@ -483,48 +603,72 @@ const AdminDashboard = () => {
   };
 
   const updateSalarySlip = async () => {
-    setLoading(true);
-    setError('');
-    
-    try {
-      const netSalary = calculateEditNetSalary();
-      
-      const response = await fetch(`${API_URL}/salary-slip/${editSalarySlipForm.id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify({
-          ...editSalarySlipForm,
-          netSalary
-        })
-      });
-      
-      if (!response.ok) {
-        throw new Error('Failed to update salary slip');
+    // Open confirmation dialog
+    setConfirmDialog({
+      open: true,
+      title: 'Update Salary Slip',
+      message: 'Are you sure you want to update this salary slip? An email notification will be sent to the employee if the amounts change.',
+      onConfirm: async () => {
+        try {
+          setLoading(true);
+          
+          // Calculate net salary if not already set
+          const netSalary = editSalarySlipForm.netSalary || calculateEditNetSalary();
+          
+          const response = await fetch(`${API_URL}/salary-slip/${editSalarySlipForm.id}`, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${localStorage.getItem('token')}`
+            },
+            body: JSON.stringify({
+              basicSalary: editSalarySlipForm.basicSalary,
+              allowances: editSalarySlipForm.allowances,
+              deductions: editSalarySlipForm.deductions,
+              netSalary,
+              status: 'issued'
+            })
+          });
+          
+          if (!response.ok) {
+            throw new Error('Failed to update salary slip');
+          }
+          
+          const data = await response.json();
+          
+          // Update the salary slip in the list
+          setSalarySlips(salarySlips.map(slip => 
+            slip.id === editSalarySlipForm.id ? data.salarySlip : slip
+          ));
+          
+          // Close dialog
+          setEditSalarySlipDialog(false);
+          
+          // Show success notification
+          setNotification({
+            open: true,
+            message: 'Salary slip updated successfully! Email notification sent if amounts changed.',
+            severity: 'success'
+          });
+        } catch (error) {
+          console.error('Error updating salary slip:', error);
+          setNotification({
+            open: true,
+            message: 'Failed to update salary slip: ' + error.message,
+            severity: 'error'
+          });
+        } finally {
+          setLoading(false);
+        }
       }
-      
-      // Close the dialog first to improve UX
-      setEditSalarySlipDialog(false);
-      
-      // Refresh salary slips data after update
-      await fetchSalarySlips();
-      
-      // Show success message
-      setError('');
-    } catch (error) {
-      setError('Failed to update salary slip: ' + error.message);
-      console.error(error);
-    } finally {
-      setLoading(false);
-    }
+    });
   };
 
   // Add downloadSalarySlip function
   const downloadSalarySlip = async (id) => {
     try {
       setLoading(true);
+      
       const response = await fetch(`${API_URL}/salary-slip/${id}/download`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
@@ -553,10 +697,19 @@ const AdminDashboard = () => {
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
       
-      setError('');
+      // Show success notification
+      setNotification({
+        open: true,
+        message: 'Salary slip downloaded successfully',
+        severity: 'success'
+      });
     } catch (error) {
       console.error('Error downloading salary slip:', error);
-      setError('Failed to download salary slip: ' + error.message);
+      setNotification({
+        open: true,
+        message: 'Failed to download salary slip: ' + error.message,
+        severity: 'error'
+      });
     } finally {
       setLoading(false);
     }
@@ -753,7 +906,7 @@ const AdminDashboard = () => {
       ],
     };
   };
-
+  
   const getMonthlyExpenseTrends = () => {
     if (!expenses || expenses.length === 0) return { labels: [], datasets: [] };
     
@@ -854,7 +1007,8 @@ const AdminDashboard = () => {
         </ListItem>
         <ListItem button onClick={() => setTabValue(3)}>
           <ListItemIcon>
-            <ReceiptIcon />
+            {/* <ReceiptIcon /> */}
+            <AccountBalanceWalletIcon />
           </ListItemIcon>
           <ListItemText primary="Expenses" />
         </ListItem>
@@ -946,6 +1100,27 @@ const AdminDashboard = () => {
     return `${day}/${month}/${year}`;
   };
   
+  const handleCloseNotification = () => {
+    setNotification({
+      ...notification,
+      open: false
+    });
+  };
+
+  const handleConfirmDialogClose = () => {
+    setConfirmDialog({
+      ...confirmDialog,
+      open: false
+    });
+  };
+
+  const handleConfirmAction = () => {
+    if (confirmDialog.onConfirm) {
+      confirmDialog.onConfirm();
+    }
+    handleConfirmDialogClose();
+  };
+
   return (
     <Box sx={{ display: 'flex' }}>
       <AppBar position="fixed">
@@ -1522,41 +1697,7 @@ const AdminDashboard = () => {
                     <Bar 
                       data={getExpensesByCategory()}
                       options={{
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                          legend: {
-                            display: false,
-                          },
-                          title: {
-                            display: false,
-                          },
-                        },
-                        scales: {
-                          y: {
-                            beginAtZero: true,
-                            title: {
-                              display: true,
-                              text: 'Amount ($)'
-                            }
-                          }
-                        }
-                      }}
-                    />
-                  </Box>
-                </Paper>
-              </Grid>
-              
-              {/* Monthly Expense Trends Chart */}
-              <Grid item xs={12}>
-                <Paper sx={{ p: 3 }}>
-                  <Typography variant="h6" gutterBottom>
-                    Monthly Expense Trends ({new Date().getFullYear()})
-                  </Typography>
-                  <Box sx={{ height: 300 }}>
-                    <Line 
-                      data={getMonthlyExpenseTrends()}
-                      options={{
+                        // responsive:
                         responsive: true,
                         maintainAspectRatio: false,
                         plugins: {
@@ -1897,6 +2038,37 @@ const AdminDashboard = () => {
             </Button>
           </DialogActions>
         </Dialog>
+        
+        {/* Confirmation Dialog */}
+        <Dialog
+          open={confirmDialog.open}
+          onClose={handleConfirmDialogClose}
+        >
+          <DialogTitle>{confirmDialog.title}</DialogTitle>
+          <DialogContent>
+            <DialogContentText>
+              {confirmDialog.message}
+            </DialogContentText>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={handleConfirmDialogClose}>Cancel</Button>
+            <Button onClick={handleConfirmAction} variant="contained" color="primary">
+              Confirm
+            </Button>
+          </DialogActions>
+        </Dialog>
+        
+        {/* Notification Snackbar */}
+        <Snackbar
+          open={notification.open}
+          autoHideDuration={6000}
+          onClose={handleCloseNotification}
+          anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+        >
+          <Alert onClose={handleCloseNotification} severity={notification.severity} sx={{ width: '100%' }}>
+            {notification.message}
+          </Alert>
+        </Snackbar>
       </Box>
     </Box>
   );

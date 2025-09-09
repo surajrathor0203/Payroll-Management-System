@@ -1,5 +1,6 @@
 import jwt from 'jsonwebtoken';
 import User from '../models/userModel.js';
+import { sendRegistrationEmail, sendDepartmentAssignmentEmail, sendAdminNotificationEmail } from '../utils/emailService.js';
 
 // Generate JWT token
 const generateToken = (user) => {
@@ -50,9 +51,10 @@ export const signup = async (req, res) => {
     // Generate token
     const token = generateToken(userData);
     
+    // Send response first
     res.status(201).json({
       success: true,
-      message: 'User registered successfully',
+      message: 'User registered successfully. Welcome email sent!',
       token,
       user: {
         uid: newUser._id,
@@ -61,6 +63,32 @@ export const signup = async (req, res) => {
         role: newUser.role
       }
     });
+    
+    // Send registration email to employee and notification to admin after response
+    if (newUser.role === 'employee') {
+      try {
+        // Send welcome email to employee
+        await sendRegistrationEmail(newUser.email, newUser.fullName);
+        console.log('Registration email sent successfully to:', newUser.email);
+        
+        // Find all admin users and send notification emails
+        const adminUsers = await User.find({ role: 'admin' }).select('email');
+        
+        for (const admin of adminUsers) {
+          try {
+            await sendAdminNotificationEmail(admin.email, newUser.fullName, newUser.email);
+            console.log('Admin notification email sent successfully to:', admin.email);
+          } catch (adminEmailError) {
+            console.error('Failed to send admin notification email to:', admin.email, adminEmailError);
+          }
+        }
+        
+      } catch (emailError) {
+        console.error('Failed to send registration emails:', emailError);
+        // Continue with registration even if email fails
+      }
+    }
+    
   } catch (error) {
     console.error('Signup error:', error);
     
@@ -192,6 +220,9 @@ export const updateEmployee = async (req, res) => {
     const { employeeId } = req.params;
     const { department, salary } = req.body;
     
+    // Log for debugging
+    console.log(`Updating employee ${employeeId} with:`, { department, salary });
+    
     // Validate input
     if (!department && salary === undefined) {
       return res.status(400).json({
@@ -199,6 +230,22 @@ export const updateEmployee = async (req, res) => {
         message: 'Please provide department or salary to update'
       });
     }
+    
+    // Check if employee exists first
+    const employee = await User.findById(employeeId);
+    if (!employee) {
+      console.error(`Employee with ID ${employeeId} not found`);
+      return res.status(404).json({
+        success: false,
+        message: `Employee with ID ${employeeId} not found`
+      });
+    }
+    
+    console.log('Found employee:', {
+      id: employee._id,
+      name: employee.fullName,
+      email: employee.email
+    });
     
     // Find and update employee
     const updatedEmployee = await User.findByIdAndUpdate(
@@ -226,11 +273,29 @@ export const updateEmployee = async (req, res) => {
       salary: updatedEmployee.salary || 0
     };
     
+    // Send response first
     res.status(200).json({
       success: true,
       message: 'Employee updated successfully',
       employee: formattedEmployee
     });
+    
+    // Send department assignment email if department was assigned for the first time
+    if (department && department !== 'Not assigned') {
+      try {
+        await sendDepartmentAssignmentEmail(
+          updatedEmployee.email, 
+          updatedEmployee.fullName, 
+          department, 
+          updatedEmployee.salary || 0
+        );
+        console.log('Department assignment email sent successfully to:', updatedEmployee.email);
+      } catch (emailError) {
+        console.error('Failed to send department assignment email:', emailError);
+        // Continue with update even if email fails
+      }
+    }
+    
   } catch (error) {
     console.error('Update employee error:', error);
     res.status(500).json({

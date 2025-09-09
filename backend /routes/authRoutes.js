@@ -9,8 +9,10 @@ router.post('/signup', signup);
 router.post('/login', login);
 router.get('/me', authenticateUser, getCurrentUser);
 
-// Admin routes - add new endpoint
+// Admin routes
 router.get('/employees', authenticateUser, authorizeAdmin, getAllEmployees);
+// Add both routes to support both frontend calls
+router.put('/employee/:employeeId', authenticateUser, authorizeAdmin, updateEmployee);
 router.put('/employees/:employeeId', authenticateUser, authorizeAdmin, updateEmployee);
 
 export default router;

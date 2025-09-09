@@ -36,7 +36,8 @@ import {
   FormControl,
   InputLabel,
   Select,
-  InputAdornment
+  InputAdornment,
+  Snackbar
 } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
 import DashboardIcon from '@mui/icons-material/Dashboard';
@@ -93,6 +94,12 @@ const EmployeeDashboard = () => {
     date: new Date().toISOString().split('T')[0],
     category: '',
     description: ''
+  });
+  // Add notification state
+  const [notification, setNotification] = useState({
+    open: false,
+    message: '',
+    severity: 'success'
   });
 
   // Use useCallback to memoize fetch functions
@@ -220,6 +227,14 @@ const EmployeeDashboard = () => {
     setTabValue(newValue);
   };
 
+  // Add function to handle notification close
+  const handleCloseNotification = () => {
+    setNotification({
+      ...notification,
+      open: false
+    });
+  };
+
   const handleDialogOpen = () => {
     setDialogOpen(true);
   };
@@ -237,39 +252,49 @@ const EmployeeDashboard = () => {
   };
 
   const submitExpense = async () => {
-    setLoading(true);
-    setError('');
-    
     try {
+      setLoading(true);
+      setError('');
+      
       const response = await fetch(`${API_URL}/expense`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         },
-        body: JSON.stringify({
-          ...expenseForm,
-          employeeId: user?.uid  // Use uid instead of id
-        })
+        body: JSON.stringify(expenseForm)
       });
       
-      if (!response.ok) {
-        throw new Error('Failed to submit expense');
+      const data = await response.json();
+      
+      if (response.ok) {
+        // Add the new expense to the list
+        setExpenses([data, ...expenses]);
+        
+        // Reset form
+        setExpenseForm({
+          title: '',
+          amount: '',
+          date: new Date().toISOString().split('T')[0],
+          category: '',
+          description: ''
+        });
+        
+        // Close dialog
+        setDialogOpen(false);
+        
+        // Show success notification
+        setNotification({
+          open: true,
+          message: 'Expense submitted successfully! Email notifications have been sent.',
+          severity: 'success'
+        });
+      } else {
+        setError(data.message || 'Failed to submit expense');
       }
-      
-      const newExpense = await response.json();
-      setExpenses(prev => [...prev, newExpense]);
-      setDialogOpen(false);
-      setExpenseForm({
-        title: '',
-        amount: '',
-        date: new Date().toISOString().split('T')[0],
-        category: '',
-        description: ''
-      });
     } catch (error) {
-      setError('Failed to submit expense: ' + error.message);
-      console.error(error);
+      console.error('Error submitting expense:', error);
+      setError('Error submitting expense. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -308,10 +333,19 @@ const EmployeeDashboard = () => {
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
       
-      setError('');
+      // Show success notification
+      setNotification({
+        open: true,
+        message: 'Salary slip downloaded successfully',
+        severity: 'success'
+      });
     } catch (error) {
       console.error('Error downloading salary slip:', error);
-      setError('Failed to download salary slip: ' + error.message);
+      setNotification({
+        open: true,
+        message: 'Failed to download salary slip: ' + error.message,
+        severity: 'error'
+      });
     } finally {
       setLoading(false);
     }
@@ -468,97 +502,98 @@ const EmployeeDashboard = () => {
           <Tab label="Expenses" />
         </Tabs>
         
-        {error && (
-          <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
-            {error}
-          </Alert>
-        )}
-        
-        {/* Salary Slips Tab */}
-        <TabPanel value={tabValue} index={1}>
-          <Typography variant="h5" gutterBottom>
-            Your Salary History
-          </Typography>
-          
-          {/* Add search field */}
-          <TextField
-            fullWidth
-            variant="outlined"
-            placeholder="Search by month, year, or amount..."
-            value={salarySlipSearch}
-            onChange={(e) => setSalarySlipSearch(e.target.value)}
-            sx={{ mb: 2 }}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <SearchIcon />
-                </InputAdornment>
-              ),
-            }}
-          />
-          
-          {loading ? (
-            <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}>
-              <CircularProgress />
-            </Box>
+    {/* Salary Slips Tab */}
+<TabPanel value={tabValue} index={1}>
+  <Typography variant="h5" gutterBottom>
+    Your Salary History
+  </Typography>
+
+  {/* Add search field */}
+  <TextField
+    fullWidth
+    variant="outlined"
+    placeholder="Search by month, year, or amount..."
+    value={salarySlipSearch}
+    onChange={(e) => setSalarySlipSearch(e.target.value)}
+    sx={{ mb: 2 }}
+    InputProps={{
+      startAdornment: (
+        <InputAdornment position="start">
+          <SearchIcon />
+        </InputAdornment>
+      ),
+    }}
+  />
+
+  {loading ? (
+    <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}>
+      <CircularProgress />
+    </Box>
+  ) : (
+    <TableContainer component={Paper}>
+      <Table>
+        <TableHead>
+          <TableRow>
+            <TableCell>Month/Year</TableCell>
+            <TableCell>Basic Salary</TableCell>
+            <TableCell>Allowances</TableCell>
+            <TableCell>Deductions</TableCell>
+            <TableCell>Net Salary</TableCell>
+            <TableCell>Status</TableCell>
+            <TableCell>Actions</TableCell>
+          </TableRow>
+        </TableHead>
+        <TableBody>
+          {filteredSalarySlips.length > 0 ? (
+            filteredSalarySlips.map((slip) => (
+              <TableRow key={slip._id || slip.id}>
+                <TableCell>{`${slip.month}/${slip.year}`}</TableCell>
+                <TableCell>${slip.basicSalary}</TableCell>
+                <TableCell>${slip.allowances}</TableCell>
+                <TableCell>${slip.deductions}</TableCell>
+                <TableCell>${slip.netSalary}</TableCell>
+                <TableCell>
+                  <Box
+                    sx={{
+                      display: 'inline-block',
+                      px: 1,
+                      py: 0.5,
+                      borderRadius: 1,
+                      bgcolor: 'success.light',
+                      color: 'white',
+                    }}
+                  >
+                    {slip.status || 'Processed'}
+                  </Box>
+                </TableCell>
+                <TableCell>
+                  <IconButton
+                    size="small"
+                    color="primary"
+                    onClick={() =>
+                      downloadSalarySlip(slip._id || slip.id)
+                    }
+                  >
+                    <DownloadIcon />
+                  </IconButton>
+                </TableCell>
+              </TableRow>
+            ))
           ) : (
-            <TableContainer component={Paper}>
-              <Table>
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Month/Year</TableCell>
-                    <TableCell>Basic Salary</TableCell>
-                    <TableCell>Allowances</TableCell>
-                    <TableCell>Deductions</TableCell>
-                    <TableCell>Net Salary</TableCell>
-                    <TableCell>Status</TableCell>
-                    <TableCell>Actions</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {filteredSalarySlips.length > 0 ? (
-                    filteredSalarySlips.map(slip => (
-                      <TableRow key={slip._id || slip.id}>
-                        <TableCell>{`${slip.month}/${slip.year}`}</TableCell>
-                        <TableCell>${slip.basicSalary}</TableCell>
-                        <TableCell>${slip.allowances}</TableCell>
-                        <TableCell>${slip.deductions}</TableCell>
-                        <TableCell>${slip.netSalary}</TableCell>
-                        <TableCell>
-                          <Box sx={{
-                            display: 'inline-block',
-                            px: 1,
-                            py: 0.5,
-                            borderRadius: 1,
-                            bgcolor: 'success.light',
-                            color: 'white'
-                          }}>
-                            {slip.status || 'Processed'}
-                          </Box>
-                        </TableCell>
-                        <TableCell>
-                          <IconButton 
-                            size="small" 
-                            color="primary"
-                            onClick={() => downloadSalarySlip(slip._id || slip.id)}
-                          >
-                            <DownloadIcon />
-                          </IconButton>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  ) : (
-                    <TableRow>
-                      <TableCell colSpan={7} align="center">
-                        {salarySlipSearch ? 'No salary slips found matching your search' : 'No salary slips found'}
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </TableContainer>
+            <TableRow>
+              <TableCell colSpan={7} align="center">
+                {salarySlipSearch
+                  ? 'No salary slips found matching your search'
+                  : 'No salary slips found'}
+              </TableCell>
+            </TableRow>
           )}
-        </TabPanel>
+        </TableBody>
+      </Table>
+    </TableContainer>
+  )}
+</TabPanel>
+
         
         {/* Dashboard Tab */}
         <TabPanel value={tabValue} index={0}>
@@ -635,12 +670,32 @@ const EmployeeDashboard = () => {
                   <Typography color="textSecondary" gutterBottom>
                     Expense Requests
                   </Typography>
-                  <Typography variant="h3">
-                    {expenses.length}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    {Array.isArray(expenses) ? expenses.filter(e => e.status === 'pending').length : 0} pending approval
-                  </Typography>
+                  <Grid container spacing={1}>
+                    <Grid item xs={6}>
+                      <Typography variant="h6">Total:</Typography>
+                      <Typography variant="h4" sx={{ color: 'text.primary' }}>
+                        {expenses.length}
+                      </Typography>
+                    </Grid>
+                    <Grid item xs={6}>
+                      <Typography variant="h6">Pending:</Typography>
+                      <Typography variant="h4" sx={{ color: 'warning.main' }}>
+                        {Array.isArray(expenses) ? expenses.filter(e => e.status === 'pending').length : 0}
+                      </Typography>
+                    </Grid>
+                    <Grid item xs={6}>
+                      <Typography variant="h6">Approved:</Typography>
+                      <Typography variant="h4" sx={{ color: 'success.main' }}>
+                        {Array.isArray(expenses) ? expenses.filter(e => e.status === 'approved').length : 0}
+                      </Typography>
+                    </Grid>
+                    <Grid item xs={6}>
+                      <Typography variant="h6">Rejected:</Typography>
+                      <Typography variant="h4" sx={{ color: 'error.main' }}>
+                        {Array.isArray(expenses) ? expenses.filter(e => e.status === 'rejected').length : 0}
+                      </Typography>
+                    </Grid>
+                  </Grid>
                 </CardContent>
               </Card>
             </Grid>
@@ -813,6 +868,18 @@ const EmployeeDashboard = () => {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Notification Snackbar */}
+      <Snackbar 
+        open={notification.open} 
+        autoHideDuration={6000} 
+        onClose={handleCloseNotification}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+      >
+        <Alert onClose={handleCloseNotification} severity={notification.severity} sx={{ width: '100%' }}>
+          {notification.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };

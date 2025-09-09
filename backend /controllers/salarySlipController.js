@@ -1,6 +1,7 @@
 import SalarySlip from '../models/salarySlipModel.js';
 import User from '../models/userModel.js';
 import PDFDocument from 'pdfkit';
+import { sendSalarySlipNotificationEmail } from '../utils/emailService.js';
 
 // Create a new salary slip
 export const createSalarySlip = async (req, res) => {
@@ -45,7 +46,23 @@ export const createSalarySlip = async (req, res) => {
       status: savedSalarySlip.status
     };
     
+    // Send response first
     res.status(201).json(formattedSlip);
+    
+    // Send email notification to employee after response
+    if (employee.email) {
+      try {
+        await sendSalarySlipNotificationEmail(
+          employee.email,
+          employee.fullName,
+          formattedSlip
+        );
+        console.log('Salary slip notification email sent successfully');
+      } catch (emailError) {
+        console.error('Error sending salary slip notification email:', emailError);
+      }
+    }
+    
   } catch (error) {
     console.error('Create salary slip error:', error);
     res.status(500).json({
@@ -84,11 +101,48 @@ export const updateSalarySlip = async (req, res) => {
       { new: true }
     );
     
+    // Send the response first
     res.status(200).json({
       success: true,
       message: 'Salary slip updated successfully',
       salarySlip: updatedSalarySlip
     });
+    
+    // Get employee information to send notification after response
+    try {
+      const employee = await User.findById(salarySlip.employeeId);
+      
+      // Only send notification if there are significant changes
+      if (employee && employee.email && 
+          (basicSalary !== salarySlip.basicSalary || 
+           allowances !== salarySlip.allowances || 
+           deductions !== salarySlip.deductions || 
+           netSalary !== salarySlip.netSalary)) {
+        
+        const formattedSlip = {
+          id: updatedSalarySlip._id,
+          employeeId: updatedSalarySlip.employeeId,
+          employeeName: employee.fullName,
+          month: updatedSalarySlip.month,
+          year: updatedSalarySlip.year,
+          basicSalary: updatedSalarySlip.basicSalary,
+          allowances: updatedSalarySlip.allowances,
+          deductions: updatedSalarySlip.deductions,
+          netSalary: updatedSalarySlip.netSalary,
+          status: updatedSalarySlip.status
+        };
+        
+        await sendSalarySlipNotificationEmail(
+          employee.email,
+          employee.fullName,
+          formattedSlip
+        );
+        console.log('Salary slip update notification email sent successfully');
+      }
+    } catch (emailError) {
+      console.error('Error sending salary slip update notification email:', emailError);
+    }
+    
   } catch (error) {
     console.error('Update salary slip error:', error);
     res.status(500).json({
