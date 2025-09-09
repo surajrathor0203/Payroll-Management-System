@@ -50,7 +50,6 @@ import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import DownloadIcon from '@mui/icons-material/Download';
 import SearchIcon from '@mui/icons-material/Search';
-import BarChartIcon from '@mui/icons-material/BarChart';
 // Import Chart.js components
 import {
   Chart as ChartJS,
@@ -1007,16 +1006,9 @@ const AdminDashboard = () => {
         </ListItem>
         <ListItem button onClick={() => setTabValue(3)}>
           <ListItemIcon>
-            {/* <ReceiptIcon /> */}
             <AccountBalanceWalletIcon />
           </ListItemIcon>
           <ListItemText primary="Expenses" />
-        </ListItem>
-        <ListItem button onClick={() => setTabValue(4)}>
-          <ListItemIcon>
-            <BarChartIcon />
-          </ListItemIcon>
-          <ListItemText primary="Charts" />
         </ListItem>
       </List>
       <Divider />
@@ -1172,7 +1164,6 @@ const AdminDashboard = () => {
           <Tab label="Employees" />
           <Tab label="Salary Slips" />
           <Tab label="Expenses" />
-          <Tab label="Charts" />
         </Tabs>
         
         {error && (
@@ -1220,6 +1211,303 @@ const AdminDashboard = () => {
                 </CardContent>
               </Card>
             </Grid>
+            
+            {/* Salary Analytics Section */}
+            <Grid item xs={12}>
+              <Typography variant="h5" gutterBottom sx={{ mt: 4, mb: 2 }}>
+                Salary Analytics
+              </Typography>
+            </Grid>
+            
+            {/* Department Salary Chart */}
+            <Grid item xs={12} md={6}>
+              <Paper sx={{ p: 3 }}>
+                <Typography variant="h6" gutterBottom>
+                  Average Salary by Department
+                </Typography>
+                <Box sx={{ height: 300 }}>
+                  <Bar 
+                    data={getDepartmentSalaries()}
+                    options={{
+                      responsive: true,
+                      maintainAspectRatio: false,
+                      plugins: {
+                        legend: {
+                          position: 'top',
+                        },
+                        title: {
+                          display: false,
+                        },
+                      },
+                    }}
+                  />
+                </Box>
+              </Paper>
+            </Grid>
+            
+            {/* Salary Distribution Chart */}
+            <Grid item xs={12} md={6}>
+              <Paper sx={{ p: 3 }}>
+                <Typography variant="h6" gutterBottom>
+                  Salary Distribution
+                </Typography>
+                <Box sx={{ height: 300, display: 'flex', justifyContent: 'center' }}>
+                  <Pie 
+                    data={getSalaryDistribution()}
+                    options={{
+                      responsive: true,
+                      maintainAspectRatio: false,
+                      plugins: {
+                        legend: {
+                          position: 'right',
+                        },
+                        title: {
+                          display: false,
+                        },
+                      },
+                    }}
+                  />
+                </Box>
+              </Paper>
+            </Grid>
+
+            
+            
+            {/* Monthly Salary Expenses Chart */}
+            <Grid item xs={12}>
+              <Paper sx={{ p: 3 }}>
+                <Typography variant="h6" gutterBottom>
+                  Monthly Salary Expenditure
+                </Typography>
+                <Box sx={{ height: 300 }}>
+                  <Line 
+                    data={getMonthlySalaryTotals()}
+                    options={{
+                      responsive: true,
+                      maintainAspectRatio: false,
+                      plugins: {
+                        legend: {
+                          position: 'top',
+                        },
+                        title: {
+                          display: false,
+                        },
+                      },
+                      scales: {
+                        y: {
+                          beginAtZero: true,
+                          title: {
+                            display: true,
+                            text: 'Amount ($)'
+                          }
+                        }
+                      }
+                    }}
+                  />
+                </Box>
+              </Paper>
+            </Grid>
+
+
+          {/* Summary Stats */}
+            <Grid item xs={12} md={4}>
+                <Card sx={{ bgcolor: 'info.light' }}>
+                  <CardContent>
+                    <Typography color="white" gutterBottom>
+                      Average Salary
+                    </Typography>
+                    <Typography variant="h4" color="white">
+                      ${employees.length > 0 
+                        ? (employees.reduce((sum, emp) => sum + (parseFloat(emp.salary) || 0), 0) / employees.length).toFixed(2) 
+                        : '0.00'}
+                    </Typography>
+                  </CardContent>
+                </Card>
+              </Grid>
+              
+              <Grid item xs={12} md={4}>
+                <Card sx={{ bgcolor: 'secondary.light' }}>
+                  <CardContent>
+                    <Typography color="white" gutterBottom>
+                      Highest Salary
+                    </Typography>
+                    <Typography variant="h4" color="white">
+                      ${employees.length > 0 
+                        ? Math.max(...employees.map(emp => parseFloat(emp.salary) || 0)).toFixed(2) 
+                        : '0.00'}
+                    </Typography>
+                  </CardContent>
+                </Card>
+              </Grid>
+              
+              <Grid item xs={12} md={4}>
+                <Card sx={{ bgcolor: 'primary.light' }}>
+                  <CardContent>
+                    <Typography color="white" gutterBottom>
+                      Total Monthly Payroll
+                    </Typography>
+                    <Typography variant="h4" color="white">
+                      ${employees.reduce((sum, emp) => sum + (parseFloat(emp.salary) || 0), 0).toFixed(2)}
+                    </Typography>
+                  </CardContent>
+                </Card>
+              </Grid>
+            
+            {/* Expense Analytics Section */}
+            <Grid item xs={12}>
+              <Typography variant="h5" gutterBottom sx={{ mt: 4, mb: 2 }}>
+                Expense Analytics
+              </Typography>
+            </Grid>
+            
+            {/* Expense Status Distribution Chart */}
+            <Grid item xs={12} md={6}>
+              <Paper sx={{ p: 3 }}>
+                <Typography variant="h6" gutterBottom>
+                  Expense Status Distribution
+                </Typography>
+                <Box sx={{ height: 300, display: 'flex', justifyContent: 'center' }}>
+                  <Pie 
+                    data={getExpenseStatusDistribution()}
+                    options={{
+                      responsive: true,
+                      maintainAspectRatio: false,
+                      plugins: {
+                        legend: {
+                          position: 'right',
+                        },
+                        title: {
+                          display: false,
+                        },
+                      },
+                    }}
+                  />
+                </Box>
+              </Paper>
+            </Grid>
+            
+            {/* Expense Category Chart */}
+            <Grid item xs={12} md={6}>
+              <Paper sx={{ p: 3 }}>
+                <Typography variant="h6" gutterBottom>
+                  Expenses by Category
+                </Typography>
+                <Box sx={{ height: 300 }}>
+                  <Bar 
+                    data={getExpensesByCategory()}
+                    options={{
+                      responsive: true,
+                      maintainAspectRatio: false,
+                      plugins: {
+                        legend: {
+                          position: 'top',
+                        },
+                        title: {
+                          display: false,
+                        },
+                      },
+                      scales: {
+                        y: {
+                          beginAtZero: true,
+                          title: {
+                            display: true,
+                            text: 'Amount ($)'
+                          }
+                        }
+                      }
+                    }}
+                  />
+                </Box>
+              </Paper>
+            </Grid>
+            
+            {/* Monthly Expenses Expenditure Chart */}
+            <Grid item xs={12}>
+              <Paper sx={{ p: 3 }}>
+                <Typography variant="h6" gutterBottom>
+                  Monthly Expenses Expenditure
+                </Typography>
+                <Box sx={{ height: 300 }}>
+                  <Line 
+                    data={getMonthlyExpenseTrends()}
+                    options={{
+                      responsive: true,
+                      maintainAspectRatio: false,
+                      plugins: {
+                        legend: {
+                          position: 'top',
+                        },
+                        title: {
+                          display: false,
+                        },
+                      },
+                      scales: {
+                        y: {
+                          beginAtZero: true,
+                          title: {
+                            display: true,
+                            text: 'Amount ($)'
+                          }
+                        }
+                      }
+                    }}
+                  />
+                </Box>
+              </Paper>
+            </Grid>
+            
+            {/* Expense Summary Stats */}
+              <Grid item xs={12} md={3}>
+                <Card>
+                  <CardContent>
+                    <Typography color="textSecondary" gutterBottom>
+                      Total Expenses
+                    </Typography>
+                    <Typography variant="h4">
+                      ${calculateTotalExpenses()}
+                    </Typography>
+                  </CardContent>
+                </Card>
+              </Grid>
+              
+              <Grid item xs={12} md={3}>
+                <Card sx={{ bgcolor: 'success.light' }}>
+                  <CardContent>
+                    <Typography color="white" gutterBottom>
+                      Approved Expenses
+                    </Typography>
+                    <Typography variant="h4" color="white">
+                      ${calculateTotalExpenses('approved')}
+                    </Typography>
+                  </CardContent>
+                </Card>
+              </Grid>
+              
+              <Grid item xs={12} md={3}>
+                <Card sx={{ bgcolor: 'warning.light' }}>
+                  <CardContent>
+                    <Typography color="white" gutterBottom>
+                      Pending Approval
+                    </Typography>
+                    <Typography variant="h4" color="white">
+                      ${calculateTotalExpenses('pending')}
+                    </Typography>
+                  </CardContent>
+                </Card>
+              </Grid>
+              
+              <Grid item xs={12} md={3}>
+                <Card sx={{ bgcolor: 'error.light' }}>
+                  <CardContent>
+                    <Typography color="white" gutterBottom>
+                      Rejected Expenses
+                    </Typography>
+                    <Typography variant="h4" color="white">
+                      ${calculateTotalExpenses('rejected')}
+                    </Typography>
+                  </CardContent>
+                </Card>
+              </Grid>
           </Grid>
         </TabPanel>
         
@@ -1417,6 +1705,7 @@ const AdminDashboard = () => {
           )}
         </TabPanel>
         
+        
         {/* Expenses Tab */}
         <TabPanel value={tabValue} index={3}>
           <Typography variant="h5" sx={{ mb: 2 }}>
@@ -1508,333 +1797,6 @@ const AdminDashboard = () => {
               </TableBody>
             </Table>
           </TableContainer>
-        </TabPanel>
-        
-        {/* Charts Tab */}
-        <TabPanel value={tabValue} index={4}>
-          <Typography variant="h5" gutterBottom>
-            Salary Analytics
-          </Typography>
-          
-          {loading ? (
-            <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}>
-              <CircularProgress />
-            </Box>
-          ) : (
-            <>
-              <Grid container spacing={3}>
-                {/* Department Salary Chart */}
-                <Grid item xs={12} md={6}>
-                  <Paper sx={{ p: 3 }}>
-                    <Typography variant="h6" gutterBottom>
-                      Average Salary by Department
-                    </Typography>
-                    <Box sx={{ height: 300 }}>
-                      <Bar 
-                        data={getDepartmentSalaries()}
-                        options={{
-                          responsive: true,
-                          maintainAspectRatio: false,
-                          plugins: {
-                            legend: {
-                              position: 'top',
-                            },
-                            title: {
-                              display: false,
-                            },
-                          },
-                        }}
-                      />
-                    </Box>
-                  </Paper>
-                </Grid>
-                
-                {/* Salary Distribution Chart */}
-                <Grid item xs={12} md={6}>
-                  <Paper sx={{ p: 3 }}>
-                    <Typography variant="h6" gutterBottom>
-                      Salary Distribution
-                    </Typography>
-                    <Box sx={{ height: 300, display: 'flex', justifyContent: 'center' }}>
-                      <Pie 
-                        data={getSalaryDistribution()}
-                        options={{
-                          responsive: true,
-                          maintainAspectRatio: false,
-                          plugins: {
-                            legend: {
-                              position: 'right',
-                            },
-                            title: {
-                              display: false,
-                            },
-                          },
-                        }}
-                      />
-                    </Box>
-                  </Paper>
-                </Grid>
-                
-                {/* Monthly Salary Expenses Chart */}
-                <Grid item xs={12}>
-                  <Paper sx={{ p: 3 }}>
-                    <Typography variant="h6" gutterBottom>
-                      Monthly Salary Expenditure
-                    </Typography>
-                    <Box sx={{ height: 300 }}>
-                      <Line 
-                        data={getMonthlySalaryTotals()}
-                        options={{
-                          responsive: true,
-                          maintainAspectRatio: false,
-                          plugins: {
-                            legend: {
-                              position: 'top',
-                            },
-                            title: {
-                              display: false,
-                            },
-                          },
-                          scales: {
-                            y: {
-                              beginAtZero: true,
-                              title: {
-                                display: true,
-                                text: 'Amount ($)'
-                            }
-                          }
-                        }
-                      }}
-                    />
-                  </Box>
-                </Paper>
-              </Grid>
-              
-              {/* Monthly Expenses Expenditure Chart */}
-              {/* <Grid item xs={12}>
-                <Paper sx={{ p: 3 }}>
-                  <Typography variant="h6" gutterBottom>
-                    Monthly Expenses Expenditure
-                  </Typography>
-                  <Box sx={{ height: 300 }}>
-                    <Line 
-                      data={getMonthlyExpenseTrends()}
-                      options={{
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                          legend: {
-                            position: 'top',
-                          },
-                          title: {
-                            display: false,
-                          },
-                        },
-                        scales: {
-                          y: {
-                            beginAtZero: true,
-                            title: {
-                              display: true,
-                              text: 'Amount ($)'
-                            }
-                          }
-                        }
-                      }}
-                    />
-                  </Box>
-                </Paper>
-              </Grid> */}
-              
-              {/* Summary Stats */}
-              <Grid item xs={12} md={4}>
-                <Card>
-                  <CardContent>
-                    <Typography color="textSecondary" gutterBottom>
-                      Average Salary
-                    </Typography>
-                    <Typography variant="h4">
-                      ${employees.length > 0 
-                        ? (employees.reduce((sum, emp) => sum + (parseFloat(emp.salary) || 0), 0) / employees.length).toFixed(2) 
-                        : '0.00'}
-                    </Typography>
-                  </CardContent>
-                </Card>
-              </Grid>
-              
-              <Grid item xs={12} md={4}>
-                <Card>
-                  <CardContent>
-                    <Typography color="textSecondary" gutterBottom>
-                      Highest Salary
-                    </Typography>
-                    <Typography variant="h4">
-                      ${employees.length > 0 
-                        ? Math.max(...employees.map(emp => parseFloat(emp.salary) || 0)).toFixed(2) 
-                        : '0.00'}
-                    </Typography>
-                  </CardContent>
-                </Card>
-              </Grid>
-              
-              <Grid item xs={12} md={4}>
-                <Card>
-                  <CardContent>
-                    <Typography color="textSecondary" gutterBottom>
-                      Total Monthly Payroll
-                    </Typography>
-                    <Typography variant="h4">
-                      ${employees.reduce((sum, emp) => sum + (parseFloat(emp.salary) || 0), 0).toFixed(2)}
-                    </Typography>
-                  </CardContent>
-                </Card>
-              </Grid>
-            </Grid>
-            
-            {/* Expense Analytics Section */}
-            <Typography variant="h5" gutterBottom sx={{ mt: 5 }}>
-              Expense Analytics
-            </Typography>
-            
-            <Grid container spacing={3}>
-              {/* Expense Status Distribution Chart */}
-              <Grid item xs={12} md={6}>
-                <Paper sx={{ p: 3 }}>
-                  <Typography variant="h6" gutterBottom>
-                    Expense Status Distribution
-                  </Typography>
-                  <Box sx={{ height: 300, display: 'flex', justifyContent: 'center' }}>
-                    <Pie 
-                      data={getExpenseStatusDistribution()}
-                      options={{
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                          legend: {
-                            position: 'right',
-                          },
-                          title: {
-                            display: false,
-                          },
-                        },
-                      }}
-                    />
-                  </Box>
-                </Paper>
-              </Grid>
-              
-              {/* Expense Category Chart */}
-              <Grid item xs={12} md={6}>
-                <Paper sx={{ p: 3 }}>
-                  <Typography variant="h6" gutterBottom>
-                    Expenses by Category
-                  </Typography>
-                  <Box sx={{ height: 300 }}>
-                    <Bar 
-                      data={getExpensesByCategory()}
-                      options={{
-                        // responsive:
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                          legend: {
-                            position: 'top',
-                          },
-                          title: {
-                            display: false,
-                          },
-                        },
-                        scales: {
-                          y: {
-                            beginAtZero: true,
-                            title: {
-                              display: true,
-                              text: 'Amount ($)'
-                            }
-                          }
-                        }
-                      }}
-                    />
-                  </Box>
-                </Paper>
-              </Grid>
-
-              {/* Monthly Expenses Expenditure Chart */}
-              <Grid item xs={12}>
-                <Paper sx={{ p: 3 }}>
-                  <Typography variant="h6" gutterBottom>
-                    Monthly Expenses Expenditure
-                  </Typography>
-                  <Box sx={{ height: 300 }}>
-                    <Line 
-                      data={getMonthlyExpenseTrends()}
-                      options={{
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                          legend: {
-                            position: 'top',
-                          },
-                          title: {
-                            display: false,
-                          },
-                        },
-                        scales: {
-                          y: {
-                            beginAtZero: true,
-                            title: {
-                              display: true,
-                              text: 'Amount ($)'
-                            }
-                          }
-                        }
-                      }}
-                    />
-                  </Box>
-                </Paper>
-              </Grid>
-              
-              {/* Expense Summary Stats */}
-              <Grid item xs={12} md={4}>
-                <Card>
-                  <CardContent>
-                    <Typography color="textSecondary" gutterBottom>
-                      Total Expenses
-                    </Typography>
-                    <Typography variant="h4">
-                      ${calculateTotalExpenses()}
-                    </Typography>
-                  </CardContent>
-                </Card>
-              </Grid>
-              
-              <Grid item xs={12} md={4}>
-                <Card>
-                  <CardContent>
-                    <Typography color="textSecondary" gutterBottom>
-                      Approved Expenses
-                    </Typography>
-                    <Typography variant="h4">
-                      ${calculateTotalExpenses('approved')}
-                    </Typography>
-                  </CardContent>
-                </Card>
-              </Grid>
-              
-              <Grid item xs={12} md={4}>
-                <Card>
-                  <CardContent>
-                    <Typography color="textSecondary" gutterBottom>
-                      Pending Approval
-                    </Typography>
-                    <Typography variant="h4">
-                      ${calculateTotalExpenses('pending')}
-                    </Typography>
-                  </CardContent>
-                </Card>
-              </Grid>
-            </Grid>
-              </>
-          )}
         </TabPanel>
         
         {/* Edit Employee Dialog */}
