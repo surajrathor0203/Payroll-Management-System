@@ -1610,6 +1610,41 @@ const AdminDashboard = () => {
                 </Paper>
               </Grid>
               
+              {/* Monthly Expenses Expenditure Chart */}
+              {/* <Grid item xs={12}>
+                <Paper sx={{ p: 3 }}>
+                  <Typography variant="h6" gutterBottom>
+                    Monthly Expenses Expenditure
+                  </Typography>
+                  <Box sx={{ height: 300 }}>
+                    <Line 
+                      data={getMonthlyExpenseTrends()}
+                      options={{
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                          legend: {
+                            position: 'top',
+                          },
+                          title: {
+                            display: false,
+                          },
+                        },
+                        scales: {
+                          y: {
+                            beginAtZero: true,
+                            title: {
+                              display: true,
+                              text: 'Amount ($)'
+                            }
+                          }
+                        }
+                      }}
+                    />
+                  </Box>
+                </Paper>
+              </Grid> */}
+              
               {/* Summary Stats */}
               <Grid item xs={12} md={4}>
                 <Card>
@@ -1698,6 +1733,41 @@ const AdminDashboard = () => {
                       data={getExpensesByCategory()}
                       options={{
                         // responsive:
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                          legend: {
+                            position: 'top',
+                          },
+                          title: {
+                            display: false,
+                          },
+                        },
+                        scales: {
+                          y: {
+                            beginAtZero: true,
+                            title: {
+                              display: true,
+                              text: 'Amount ($)'
+                            }
+                          }
+                        }
+                      }}
+                    />
+                  </Box>
+                </Paper>
+              </Grid>
+
+              {/* Monthly Expenses Expenditure Chart */}
+              <Grid item xs={12}>
+                <Paper sx={{ p: 3 }}>
+                  <Typography variant="h6" gutterBottom>
+                    Monthly Expenses Expenditure
+                  </Typography>
+                  <Box sx={{ height: 300 }}>
+                    <Line 
+                      data={getMonthlyExpenseTrends()}
+                      options={{
                         responsive: true,
                         maintainAspectRatio: false,
                         plugins: {

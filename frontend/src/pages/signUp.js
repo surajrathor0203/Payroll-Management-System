@@ -181,7 +181,7 @@ const SignUp = () => {
                 />
               </Grid>
               
-              <Grid item xs={12}>
+              {/* <Grid item xs={12}>
                 <FormControl component="fieldset">
                   <FormLabel component="legend">Account Type</FormLabel>
                   <RadioGroup
@@ -194,7 +194,7 @@ const SignUp = () => {
                     <FormControlLabel value="admin" control={<Radio />} label="Admin" />
                   </RadioGroup>
                 </FormControl>
-              </Grid>
+              </Grid> */}
             </Grid>
             
             <Button
