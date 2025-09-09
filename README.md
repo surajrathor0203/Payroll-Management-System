@@ -2,6 +2,10 @@
 
 A comprehensive web application for managing payroll, employee expenses, and salary slips built with MERN stack (MongoDB, Express, React, Node.js).
 
+## Live Demo
+
+The application is live at: [https://payroll-management-system-gamma.vercel.app](https://payroll-management-system-gamma.vercel.app)
+
 ## Features
 
 ### For Administrators
